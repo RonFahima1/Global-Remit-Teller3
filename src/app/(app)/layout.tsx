@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import AppLayout from '@/components/layout/AppLayout';
 import { LoadingState } from '@/components/ui/loading-state';
 import { CustomSidebarProvider } from '@/components/providers/SidebarProvider';
+import { SearchProvider } from '@/components/providers/SearchProvider';
 import { useLoadingTransition } from '@/hooks/useLoadingTransition';
 
 export default function AppAreaLayout({ children }: { children: ReactNode }) {
@@ -31,7 +32,9 @@ export default function AppAreaLayout({ children }: { children: ReactNode }) {
 
   return (
     <CustomSidebarProvider>
-      <AppLayout>{children}</AppLayout>
+      <SearchProvider>
+        <AppLayout>{children}</AppLayout>
+      </SearchProvider>
     </CustomSidebarProvider>
   );
 }
