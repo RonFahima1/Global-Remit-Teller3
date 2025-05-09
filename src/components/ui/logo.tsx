@@ -2,6 +2,7 @@
 
 import React from "react";
 import Image from 'next/image';
+import Link from 'next/link';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 
@@ -31,7 +32,7 @@ export function Logo({
   const isDark = theme === 'dark';
 
   return (
-    <a
+    <Link
       href="/dashboard"
       className={cn(
         'flex items-center gap-3 font-bold text-xl transition-all duration-200',
@@ -53,6 +54,6 @@ export function Logo({
       {showText && (
         <span className="whitespace-nowrap font-bold text-2xl -ml-2">Global Remit</span>
       )}
-    </a>
+    </Link>
   );
 }
