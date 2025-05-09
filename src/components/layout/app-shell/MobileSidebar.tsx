@@ -29,7 +29,7 @@ export function MobileSidebar({ isOpen, onOpenChange, navItems }: MobileSidebarP
       >
         <div className="h-full ios-blur rounded-r-2xl">
           <div className="flex h-[70px] items-center px-6 border-b">
-            <Logo className="hover:scale-105" />
+            <Logo className="hover:scale-105" onClick={() => onOpenChange(false)} />
           </div>
           <div className="py-6">
             <nav className="space-y-2 px-4">

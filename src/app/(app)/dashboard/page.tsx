@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
 import { ArrowRightLeft, Users, DollarSign, TrendingUp, FileText, PlusCircle, RefreshCw, Send, LineChart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -80,6 +81,9 @@ export default function DashboardPage() {
     { id: 4, date: '2024-06-04', type: 'Deposit', amount: '$750', status: 'Failed', client: 'Dana Kim' },
   ];
 
+  // Get user from auth context
+  const { user } = useAuth();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-white to-gray-100 dark:from-[#18181c] dark:to-[#23232a] p-2 sm:p-4 md:p-8 font-['-apple-system','BlinkMacSystemFont','SF Pro Text',sans-serif] flex flex-col items-center">
       {(isLoading || navLoading) && <LoadingOverlay />}
@@ -89,6 +93,21 @@ export default function DashboardPage() {
         </div>
       ) : (
         <>
+          {/* Welcome Header */}
+          <motion.div 
+            className="w-full max-w-6xl mx-auto mb-6"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
+              Welcome back, {user?.name || 'demo user'}
+            </h1>
+            <p className="text-gray-500 dark:text-gray-400 mt-1">
+              Here's an overview of your teller operations
+            </p>
+          </motion.div>
+          
           {/* Main Grid: Stats + Quick Actions */}
           <div className="w-full max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             {/* Stats Cards */}
