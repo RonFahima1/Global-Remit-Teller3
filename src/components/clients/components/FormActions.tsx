@@ -1,89 +1,54 @@
-'use client';
-
-import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
+import { FormSection, SECTIONS } from '../../types/form';
 
 interface FormActionsProps {
-  isSubmitting: boolean;
+  currentSection: FormSection;
   onSubmit: () => void;
-  onCancel: () => void;
-  form: any;
-  currentSection: string;
-  setCurrentSection: (section: string) => void;
-  sections: string[];
-  isFormValid: boolean;
+  onBack?: () => void;
+  isSubmitting: boolean;
+  isValid: boolean;
 }
 
 export function FormActions({
-  isSubmitting,
-  onSubmit,
-  onCancel,
-  form,
   currentSection,
-  setCurrentSection,
-  sections,
-  isFormValid,
+  onSubmit,
+  onBack,
+  isSubmitting,
+  isValid,
 }: FormActionsProps) {
-  const { toast } = useToast();
-
-  const handleReset = () => {
-    if (confirm('Are you sure you want to reset the form? All data will be lost.')) {
-      form.reset();
-      toast({
-        title: 'Form Reset',
-        description: 'Form has been reset successfully',
-      });
-    }
-  };
-
-  const handleCancel = () => {
-    if (confirm('Are you sure you want to cancel? All unsaved changes will be lost.')) {
-      onCancel();
-    }
-  };
-
-  const currentIndex = sections.indexOf(currentSection);
-  const isLastSection = currentIndex === sections.length - 1;
+  const isLastSection = currentSection === SECTIONS[SECTIONS.length - 1];
+  const isInvalid = !isValid && !isSubmitting;
 
   return (
-    <div className="flex justify-end space-x-4 mt-8">
-      <Button variant="outline" onClick={handleReset} disabled={isSubmitting}>
-        {isSubmitting ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Resetting...
-          </>
-        ) : (
-          'Reset'
-        )}
-      </Button>
-      <Button variant="outline" onClick={handleCancel} disabled={isSubmitting}>
-        {isSubmitting ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Canceling...
-          </>
-        ) : (
-          'Cancel'
-        )}
-      </Button>
-      <Button
+    <div className="flex justify-between items-center mt-8">
+      {onBack && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+        >
+          Back
+        </button>
+      )}
+      <button
+        type="button"
         onClick={onSubmit}
-        disabled={isSubmitting || !isFormValid}
-        className="bg-primary hover:bg-primary/90"
+        disabled={isSubmitting || !isValid}
+        className={`px-6 py-2 rounded-md transition-colors duration-200 ${
+          isSubmitting
+            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            : isInvalid
+            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            : 'bg-indigo-600 text-white hover:bg-indigo-700'
+        }`}
       >
-        {isSubmitting ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Submitting...
-          </>
-        ) : isLastSection ? (
-          'Submit'
-        ) : (
-          'Next'
-        )}
-      </Button>
+        {isLastSection
+          ? isSubmitting
+            ? 'Submitting...'
+            : 'Submit'
+          : isSubmitting
+          ? 'Saving...'
+          : 'Next'}
+      </button>
     </div>
   );
 }

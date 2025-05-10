@@ -1,39 +1,28 @@
-'use client';
-
-import { Progress } from '@/components/ui/progress';
-import { useScreenReader } from '@/hooks/use-screen-reader';
+import { FormSection, SECTIONS } from '../types/form';
 
 interface FormProgressProps {
-  currentSection: string;
-  sections: string[];
-  sectionTitles: Record<string, string>;
+  currentSection: FormSection;
 }
 
-export function FormProgress({
-  currentSection,
-  sections,
-  sectionTitles,
-}: FormProgressProps) {
-  const { announce } = useScreenReader();
-  const currentIndex = sections.indexOf(currentSection);
-  const totalSections = sections.length;
-  const progress = ((currentIndex + 1) / totalSections) * 100;
-
-  useEffect(() => {
-    announce(`You are on ${sectionTitles[currentSection]} section. Progress: ${Math.round(progress)}%`);
-  }, [currentSection, announce, sectionTitles, progress]);
+export function FormProgress({ currentSection }: FormProgressProps) {
+  const totalSteps = SECTIONS.length;
+  const currentStep = SECTIONS.indexOf(currentSection) + 1;
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <span className="text-sm text-gray-500">
-          Step {currentIndex + 1} of {totalSections}
-        </span>
-        <span className="text-sm font-medium">
-          {sectionTitles[currentSection]}
-        </span>
+    <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center space-x-4">
+        <span className="text-sm font-medium text-gray-900">Step {currentStep}</span>
+        <div className="flex-1 h-0.5 bg-gray-200">
+          <div
+            className="h-0.5 bg-indigo-600"
+            style={{ width: `${(currentStep / totalSteps) * 100}%` }}
+          />
+        </div>
+        <span className="text-sm font-medium text-gray-900">{totalSteps}</span>
       </div>
-      <Progress value={progress} className="h-2" />
+      <span className="text-sm font-medium text-gray-900">
+        {currentSection.replace(/([A-Z])/g, ' $1').trim()}
+      </span>
     </div>
   );
 }

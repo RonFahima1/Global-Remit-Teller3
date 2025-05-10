@@ -1,86 +1,71 @@
-'use client';
-
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { useController } from 'react-hook-form';
+import { Control } from 'react-hook-form';
+import { cn } from '../../../utils/cn';
 
 interface FormFieldProps {
-  form: any;
   name: string;
   label: string;
-  type?: 'text' | 'email' | 'password' | 'number' | 'date' | 'select' | 'textarea';
-  required?: boolean;
-  options?: Array<{ value: string; label: string }>;
-  helpText?: string;
+  control: Control;
+  error: string;
+  type?: 'text' | 'email' | 'password' | 'tel' | 'number';
+  placeholder?: string;
   className?: string;
+  disabled?: boolean;
+  required?: boolean;
+  ariaLabel?: string;
+  ariaDescribedBy?: string;
+  ariaInvalid?: boolean;
 }
 
 export function FormField({
-  form,
   name,
   label,
+  control,
+  error,
   type = 'text',
-  required = false,
-  options,
-  helpText,
+  placeholder = '',
   className = '',
+  disabled = false,
+  required = false,
+  ariaLabel,
+  ariaDescribedBy,
+  ariaInvalid
 }: FormFieldProps) {
-  const {
-    field: { ref, ...field },
-    fieldState: { error },
-  } = useController({
-    name,
-    control: form.control,
-  });
+  const register = control.register;
 
-  const errorText = error?.message as string;
+  const commonProps = {
+    ...register(name),
+    className: cn(
+      'block w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800/30 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm transition-all duration-200',
+      error ? 'border-red-500' : '',
+      disabled ? 'bg-gray-100 dark:bg-gray-700 cursor-not-allowed' : '',
+      className
+    ),
+    placeholder,
+    disabled,
+    required,
+    'aria-label': ariaLabel || label,
+    'aria-describedby': ariaDescribedBy,
+    'aria-invalid': ariaInvalid || !!error
+  };
 
   return (
-    <div className={`space-y-2 ${className}`}>
-      <div className="flex items-center justify-between">
-        <Label htmlFor={name} className="text-sm font-medium">
-          {label} {required && <span className="text-red-500">*</span>}
-        </Label>
-        {helpText && (
-          <span className="text-sm text-gray-500">{helpText}</span>
+    <div className="space-y-2">
+      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">{label}</label>
+      <div className="relative">
+        <input
+          type={type}
+          {...commonProps}
+        />
+        {error && (
+          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+            <svg className="h-5 w-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
         )}
       </div>
-
-      {type === 'select' ? (
-        <Select
-          {...field}
-          value={field.value}
-          onChange={(e) => field.onChange(e.target.value)}
-        >
-          {options?.map((option) => (
-            <Select.Option key={option.value} value={option.value}>
-              {option.label}
-            </Select.Option>
-          ))}
-        </Select>
-      ) : type === 'textarea' ? (
-        <Textarea
-          {...field}
-          ref={ref}
-          id={name}
-          placeholder={helpText}
-          className={`w-full ${error ? 'border-red-500' : ''}`}
-        />
-      ) : (
-        <Input
-          {...field}
-          ref={ref}
-          id={name}
-          type={type}
-          placeholder={helpText}
-          className={`w-full ${error ? 'border-red-500' : ''}`}
-        />
-      )}
-
-      {errorText && (
-        <p className="text-sm text-red-500 mt-1">{errorText}</p>
+      {error && (
+        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p>
       )}
     </div>
   );

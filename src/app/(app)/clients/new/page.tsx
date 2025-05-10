@@ -1,8 +1,8 @@
 
 'use client';
 
-import { NewClientForm } from "@/components/clients/new-client-form/NewClientForm";
-import type { NewClientFormData } from "@/components/clients/new-client-form/types";
+import { NewClientForm } from "@/components/clients/NewClientForm";
+import type { NewClientFormData } from "@/components/clients/types/form";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -20,23 +20,18 @@ export default function NewClientPage() {
     const handleSubmit = async (data: NewClientFormData) => {
         setIsLoading(true);
         try {
-            // TODO: Replace with actual API call
-            // For now, we'll simulate a successful submission
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            
+            // Here you would typically make an API call with the form data
+            console.log('Form submitted:', data);
             toast({
                 title: "Success",
                 description: "Client created successfully",
-                variant: "default"
             });
-            
-            // Redirect to clients list after successful submission
             router.push('/clients');
         } catch (error) {
             console.error("Error creating client:", error);
             toast({
                 title: "Error",
-                description: "Failed to create client. Please try again.",
+                description: "Failed to create client",
                 variant: "destructive"
             });
         } finally {

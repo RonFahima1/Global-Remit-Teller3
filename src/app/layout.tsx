@@ -1,14 +1,8 @@
 import './globals.css';
 import { Inter } from "next/font/google";
-import dynamic from 'next/dynamic';
+import { Providers } from '@/components/providers/Providers';
 
 const inter = Inter({ subsets: ["latin"] });
-
-// Dynamically import Providers so it is only used on the client
-const Providers = dynamic(
-  () => import('@/components/providers/Providers').then(mod => mod.Providers),
-  { ssr: false }
-);
 
 export const metadata = {
   title: 'Global Remit Teller',
@@ -39,7 +33,6 @@ export const metadata = {
       },
     ],
   },
-  themeColor: '#007AFF',
   manifest: {
     name: 'Global Remit Teller',
     short_name: 'Global Remit',
@@ -47,7 +40,6 @@ export const metadata = {
     start_url: '/',
     display: 'standalone',
     background_color: '#111827',
-    theme_color: '#007AFF',
     icons: [
       {
         src: '/android-chrome-192x192.png',
@@ -61,6 +53,22 @@ export const metadata = {
       },
     ],
   },
+  themeColor: '#111827',
+  appleWebApp: {
+    title: 'Global Remit Teller',
+    statusBarStyle: 'default',
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: 'https://global-remit-teller.vercel.app',
+    siteName: 'Global Remit Teller',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Global Remit Teller',
+    description: 'A teller and compliance platform',
+  },
 };
 
 export default function RootLayout({
@@ -69,11 +77,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <Providers>
-          {children}
-        </Providers>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

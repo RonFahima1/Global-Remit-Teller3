@@ -1,71 +1,44 @@
-'use client';
+import { useContext } from 'react';
+import { useFormContext } from '../context/FormContext';
+import { NewClientFormData, FormSection, FormState } from '../types/form';
 
-import { useState } from 'react';
-import { useToast } from '@/components/ui/use-toast';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
+export function useFormHandlers() {
+  const context = useFormContext();
+  if (!context) {
+    throw new Error('useFormHandlers must be used within a FormProvider');
+  }
 
-interface UseFormHandlersProps {
-  formState: any;
-  onSubmit: (data: any) => void;
-  onCancel: () => void;
-  resetForm: () => void;
-  handleFileUpload: (file: File) => void;
-  handleFileRemove: (id: string) => void;
-  formSchema: z.ZodSchema;
-}
+  const { form, state, setState, currentSection, setCurrentSection, handleFileUpload, handleFileRemove, handleSubmit } = context;
 
-export function useFormHandlers({
-  formState,
-  onSubmit,
-  onCancel,
-  resetForm,
-  handleFileUpload,
-  handleFileRemove,
-  formSchema,
-}: UseFormHandlersProps) {
-  const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | undefined>(undefined);
-  const [formSuccess, setFormSuccess] = useState<string | undefined>(undefined);
+  const handleChangeSection = (section: FormSection) => {
+    setCurrentSection(section);
+  };
 
-  const onSubmitHandler = async (data: any) => {
+  const handleFormSubmit = async (data: NewClientFormData) => {
     try {
-      setIsSubmitting(true);
-      setFormError(undefined);
-      setFormSuccess(undefined);
-
-      await onSubmit(data);
-      
-      setFormSuccess('Form submitted successfully');
-      toast({
-        title: 'Success',
-        description: 'Form submitted successfully',
-      });
-    } catch (error: any) {
-      setFormError(error.message || 'An error occurred while submitting the form');
-      toast({
-        title: 'Error',
-        description: error.message || 'An error occurred while submitting the form',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSubmitting(false);
+      setState(prev => ({ ...prev, isSubmitting: true }));
+      // Here you would typically make an API call with the form data
+      console.log('Form submitted:', data);
+      setState(prev => ({ ...prev, successMessage: 'Client created successfully', isSubmitting: false }));
+    } catch (error) {
+      setState(prev => ({
+        ...prev,
+        errors: {
+          ...prev.errors,
+          [currentSection]: error instanceof Error ? error.message : 'An error occurred'
+        },
+        isSubmitting: false
+      }));
     }
   };
 
-  const handleReset = () => {
-    resetForm();
-    setFormError(undefined);
-    setFormSuccess(undefined);
-  };
-
   return {
-    isSubmitting,
-    formError,
-    formSuccess,
-    onSubmitHandler,
-    handleReset,
+    form,
+    state,
+    currentSection,
+    handleChangeSection,
+    handleFileUpload,
+    handleFileRemove,
+    handleSubmit: handleSubmit(handleFormSubmit)
   };
 }
