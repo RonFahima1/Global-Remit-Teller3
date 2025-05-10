@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # Project Memory
 
 This document serves as a comprehensive memory of the Global Remit Teller project, capturing important decisions, patterns, and architectural choices.

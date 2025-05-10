@@ -52,7 +52,7 @@ export function CustomerSearch({
   onSearch,
   showNewButton = false,
   newButtonText = "New Customer",
-  newButtonLink = "/customers/new",
+  newButtonLink = "/clients/new",
   defaultTab = "phone",
   onSearchComplete,
   hideSearch = false
