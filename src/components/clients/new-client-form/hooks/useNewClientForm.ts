@@ -1,13 +1,15 @@
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useToast } from '@/components/ui/use-toast';
-import { useState, useCallback } from 'react';
+// Import toast from our custom utility
+import { toast } from '@/lib/toast';
+import { useState, useCallback, useEffect } from 'react';
 import type { NewClientFormProps } from '../types';
 import type { FormState, FormSection } from '../types';
 import { MAX_FILE_SIZE, ACCEPTED_IMAGE_TYPES, VALIDATION_MESSAGES } from '../constants/validation';
 import type { NewClientFormData } from '../types';
-import { formSchema } from '../constants';
+import { formSchema } from '../schema';
+import { useFormNavigation } from './useFormNavigation';
 
 const defaultFormValues: NewClientFormData = {
   personalInfo: {
@@ -39,10 +41,14 @@ const defaultFormValues: NewClientFormData = {
   identification: {
     idType: 'passport',
     idNumber: '',
-    issueDate: new Date(),
-    expiryDate: new Date()
+    idExpiryDate: new Date(),
+    documentFile: null
   },
-  documentFile: null
+  documents: {
+    proofOfAddress: null,
+    financialDocuments: null,
+    additionalDocuments: null
+  }
 };
 
 const sectionConfig = {
@@ -57,62 +63,63 @@ const sectionConfig = {
   } as Record<FormSection, string>
 } as const;
 
-export const useNewClientForm = () => {
-  const [currentSection, setCurrentSection] = useState<FormSection>(sectionConfig.sections[0]);
-  const [formState, setFormState] = useState<FormState>({
+export const useNewClientForm = ({ onSubmit, onCancel, isLoading = false, initialData }: NewClientFormProps) => {
+  // No need to destructure toast as we're importing it directly
+  const [state, setState] = useState<FormState>({
     currentSection: sectionConfig.sections[0],
-    isSubmitting: false,
+    isSubmitting: isLoading,
     formError: null,
     formSuccess: null,
-    formData: defaultFormValues
+    formData: initialData ? { ...defaultFormValues, ...initialData } : defaultFormValues
   });
 
   const form = useForm<NewClientFormData>({
     resolver: zodResolver(formSchema),
-    defaultValues: defaultFormValues
+    defaultValues: initialData ? { ...defaultFormValues, ...initialData } : defaultFormValues,
+    mode: 'onChange'
   });
 
-  const handleFileUpload = useCallback(async (field: keyof NewClientFormData, file: File) => {
+  // File handling - updated to handle nested fields
+  const handleFileUpload = useCallback(async (fieldPath: string, file: File) => {
     try {
-      // TODO: Implement file upload logic
-      form.setValue(field as keyof NewClientFormData, file);
+      // Validate file size
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(VALIDATION_MESSAGES.fileSize);
+        return;
+      }
+      
+      // Validate file type
+      if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+        toast.error(VALIDATION_MESSAGES.fileType);
+        return;
+      }
+      
+      // Set the value using the path string (e.g., 'identification.documentFile')
+      form.setValue(fieldPath, file, { shouldValidate: true });
+      
+      return Promise.resolve();
     } catch (error) {
       console.error('Error uploading file:', error);
-      throw error;
+      toast.error('Failed to upload file');
+      return Promise.reject(error);
     }
   }, [form]);
 
-  const handleFileRemove = useCallback((field: keyof NewClientFormData) => {
-    form.setValue(field as keyof NewClientFormData, null);
+  const handleFileRemove = useCallback((fieldPath: string) => {
+    form.setValue(fieldPath, null, { shouldValidate: true });
+    toast.info('File removed');
   }, [form]);
 
-  const handlePrevious = useCallback(() => {
-    const currentIndex = sectionConfig.sections.indexOf(currentSection);
-    if (currentIndex > 0) {
-      const prevSection = sectionConfig.sections[currentIndex - 1];
-      setCurrentSection(prevSection);
-      setFormState(prev => ({
-        ...prev,
-        currentSection: prevSection
-      }));
-    }
-  }, [currentSection]);
+  // Navigation logic using the custom hook
+  const { handlePrevious, handleNext, goToSection } = useFormNavigation({
+    sections: sectionConfig.sections as FormSection[],
+    currentSection: state.currentSection,
+    updateCurrentSection: (section: FormSection) => setState((prev: FormState) => ({ ...prev, currentSection: section }))
+  });
 
-  const handleNext = useCallback(() => {
-    const currentIndex = sectionConfig.sections.indexOf(currentSection);
-    if (currentIndex < sectionConfig.sections.length - 1) {
-      const nextSection = sectionConfig.sections[currentIndex + 1];
-      setCurrentSection(nextSection);
-      setFormState(prev => ({
-        ...prev,
-        currentSection: nextSection
-      }));
-    }
-  }, [currentSection]);
-
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormState(prev => ({
+  // Form submission handling
+  const handleFormSubmit = useCallback(async () => {
+    setState((prev: FormState) => ({
       ...prev,
       isSubmitting: true,
       formError: null,
@@ -120,30 +127,54 @@ export const useNewClientForm = () => {
     }));
 
     try {
-      await form.handleSubmit(async (data) => {
-        // Here you would typically make an API call
-        // For now, we'll just simulate success
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setFormState(prev => ({
+      // Validate the entire form
+      const isValid = await form.trigger();
+      
+      if (!isValid) {
+        setState((prev: FormState) => ({
           ...prev,
           isSubmitting: false,
-          formSuccess: 'Client created successfully'
+          formError: 'Please fix the errors in the form before submitting'
         }));
-      })();
+        
+        toast.error('Please fix the errors in the form before submitting');
+        return;
+      }
+      
+      const formData = form.getValues();
+      
+      // Collect all document files for submission
+      const files = {
+        identificationDocument: formData.identification.documentFile,
+        proofOfAddress: formData.documents.proofOfAddress,
+        financialDocuments: formData.documents.financialDocuments,
+        additionalDocuments: formData.documents.additionalDocuments
+      };
+      
+      await onSubmit(formData, files);
+      
+      setState((prev: FormState) => ({
+        ...prev,
+        isSubmitting: false,
+        formSuccess: 'Client created successfully'
+      }));
+      
+      toast.success('Client created successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to submit form';
-      setFormState(prev => ({
+      setState((prev: FormState) => ({
         ...prev,
         isSubmitting: false,
         formError: errorMessage
       }));
+      
+      toast.error(errorMessage);
     }
-  }, [form]);
+  }, [form, onSubmit]);
 
   const resetForm = useCallback(() => {
     form.reset(defaultFormValues);
-    setCurrentSection(sectionConfig.sections[0]);
-    setFormState({
+    setState({
       currentSection: sectionConfig.sections[0],
       isSubmitting: false,
       formError: null,
@@ -152,19 +183,17 @@ export const useNewClientForm = () => {
     });
   }, [form]);
 
-  return {
-    form,
-    formState,
-    setFormState,
-    currentSection,
-    handlePrevious,
-    handleNext,
-    handleSubmit,
-    handleFileUpload,
-    handleFileRemove,
-    resetForm,
-  } as const;
-  };
+  // Watch for form changes to update formData in state
+  useEffect(() => {
+    const subscription = form.watch((value: any) => {
+      setState((prev: FormState) => ({
+        ...prev,
+        formData: value as NewClientFormData
+      }));
+    });
+    
+    return () => subscription.unsubscribe();
+  }, [form]);
 
   return {
     form,
@@ -173,6 +202,11 @@ export const useNewClientForm = () => {
     resetForm,
     handleFileUpload,
     handleFileRemove,
-    handleFormSubmit
+    handleFormSubmit,
+    handleNext,
+    handlePrevious,
+    goToSection,
+    sectionConfig
   };
+}
 }

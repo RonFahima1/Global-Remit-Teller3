@@ -1,94 +1,155 @@
+'use client';
+
 import React from 'react';
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
+import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { UseFormReturn } from 'react-hook-form';
-import { ContactInfo } from '../../../types';
+import { motion } from 'framer-motion';
+import { Mail, Phone, User } from 'lucide-react';
+import { NewClientFormData } from '../../types';
 
 interface ContactSectionProps {
-  form: UseFormReturn<ContactInfo>;
-  formState: {
-    errors: Record<string, string>;
-  };
+  form: UseFormReturn<NewClientFormData>;
+  countries: { value: string; label: string }[];
+  idTypes: { value: string; label: string }[];
+  handleFileUpload?: (field: string, file: File) => Promise<void>;
+  handleFileRemove?: (field: string) => void;
 }
 
-export const ContactSection: React.FC<ContactSectionProps> = ({
-  form,
-  formState,
-}) => {
+export function ContactSection({ form }: ContactSectionProps) {
+  // Animation variants for form fields
+  const formAnimation = {
+    hidden: { opacity: 0, y: 20 },
+    visible: (i: number) => ({
+      opacity: 1,
+      y: 0,
+      transition: {
+        delay: i * 0.1,
+        duration: 0.3,
+        ease: 'easeOut'
+      }
+    })
+  };
+
   return (
-    <div className="space-y-6">
+    <motion.div 
+      initial="hidden"
+      animate="visible"
+      className="space-y-6"
+    >
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Email</FormLabel>
-              <FormControl>
-                <Input
-                  {...field}
-                  type="email"
-                  required
-                  placeholder="Enter your email address"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <motion.div custom={0} variants={formAnimation}>
+          <FormField
+            control={form.control}
+            name="contact.email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email Address</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      {...field} 
+                      type="email"
+                      required 
+                      placeholder="Enter email address" 
+                      className="bg-background pl-10" 
+                    />
+                  </div>
+                </FormControl>
+                <FormDescription className="text-xs">
+                  Used for transaction notifications and account updates
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </motion.div>
 
-        <FormField
-          control={form.control}
-          name="phone"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Phone Number</FormLabel>
-              <FormControl>
-                <Input
-                  {...field}
-                  type="tel"
-                  required
-                  placeholder="Enter your phone number"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <motion.div custom={1} variants={formAnimation}>
+          <FormField
+            control={form.control}
+            name="contact.phone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Phone Number</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      {...field} 
+                      type="tel"
+                      required 
+                      placeholder="+1 (555) 123-4567" 
+                      className="bg-background pl-10" 
+                    />
+                  </div>
+                </FormControl>
+                <FormDescription className="text-xs">
+                  Include country code (e.g., +1 for US)
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </motion.div>
 
-        <FormField
-          control={form.control}
-          name="emergencyContactName"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Emergency Contact Name</FormLabel>
-              <FormControl>
-                <Input {...field} placeholder="Enter emergency contact name" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <motion.div custom={2} variants={formAnimation}>
+          <FormField
+            control={form.control}
+            name="contact.emergencyContactName"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Emergency Contact Name</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      {...field} 
+                      required 
+                      placeholder="Enter emergency contact name" 
+                      className="bg-background pl-10" 
+                    />
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </motion.div>
 
-        <FormField
-          control={form.control}
-          name="emergencyContactPhone"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Emergency Contact Phone</FormLabel>
-              <FormControl>
-                <Input
-                  {...field}
-                  type="tel"
-                  placeholder="Enter emergency contact phone"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <motion.div custom={3} variants={formAnimation}>
+          <FormField
+            control={form.control}
+            name="contact.emergencyContactPhone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Emergency Contact Phone</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      {...field} 
+                      type="tel"
+                      required 
+                      placeholder="+1 (555) 123-4567" 
+                      className="bg-background pl-10" 
+                    />
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </motion.div>
       </div>
-    </div>
+      
+      <motion.div custom={4} variants={formAnimation} className="mt-6">
+        <FormDescription className="text-sm text-muted-foreground">
+          Contact information is essential for account security and transaction notifications.
+          We may use these details to verify your identity when processing transactions.
+        </FormDescription>
+      </motion.div>
+    </motion.div>
   );
 }

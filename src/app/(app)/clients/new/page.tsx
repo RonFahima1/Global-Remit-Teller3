@@ -1,8 +1,8 @@
 
 'use client';
 
-import { NewClientForm } from "@/components/clients/NewClientForm";
-import type { NewClientFormData } from "@/components/clients/new-client-form/types/new-client-form.types";
+import { NewClientForm } from "@/components/clients/new-client-form/NewClientForm";
+import type { NewClientFormData } from "@/components/clients/new-client-form/types";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";

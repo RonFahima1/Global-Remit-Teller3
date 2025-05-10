@@ -10,32 +10,43 @@ import { ContactSection } from './components/sections/ContactSection';
 import { IdentificationSection } from './components/sections/IdentificationSection';
 import { EmploymentSection } from './components/sections/EmploymentSection';
 import { DocumentsSection } from './components/sections/DocumentsSection';
-import { COUNTRIES, GENDERS, ID_TYPES } from './constants';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { COUNTRIES } from './constants/countries';
+import { ID_TYPES } from './constants/identification';
 import type { NewClientFormProps } from './types';
-import type { SectionProps } from './types/section-props';
+import type { FormSection } from './types';
 
-export function NewClientForm({ onSubmit, onCancel }: NewClientFormProps) {
+export function NewClientForm({ onSubmit, onCancel, isLoading, initialData }: NewClientFormProps) {
   const { 
     form, 
     state, 
-    setState, 
     handleFileUpload, 
     handleFileRemove, 
     handleFormSubmit, 
-    resetForm 
-  } = useNewClientForm({ onSubmit, onCancel });
+    handleNext,
+    handlePrevious,
+    resetForm,
+    sectionConfig
+  } = useNewClientForm({ 
+    onSubmit, 
+    onCancel, 
+    isLoading, 
+    initialData 
+  });
 
+  // Render the appropriate section based on current step
   const renderSection = () => {
-    const sectionProps: SectionProps = {
+    const sectionProps = {
       form,
       countries: COUNTRIES,
-      genders: GENDERS,
       idTypes: ID_TYPES,
       handleFileUpload,
       handleFileRemove
     };
 
-    switch (currentSection) {
+    switch (state.currentSection) {
       case 'personalInfo':
         return <PersonalInfoSection {...sectionProps} />;
       case 'address':
@@ -52,6 +63,45 @@ export function NewClientForm({ onSubmit, onCancel }: NewClientFormProps) {
         return null;
     }
   };
+  
+  // Render form errors or success messages
+  const renderFormStatus = () => {
+    if (state.formError) {
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{state.formError}</AlertDescription>
+          </Alert>
+        </motion.div>
+      );
+    }
+    
+    if (state.formSuccess) {
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <Alert variant="success" className="mb-6">
+            <CheckCircle2 className="h-4 w-4" />
+            <AlertTitle>Success</AlertTitle>
+            <AlertDescription>{state.formSuccess}</AlertDescription>
+          </Alert>
+        </motion.div>
+      );
+    }
+    
+    return null;
+  };
 
   return (
     <Card className="w-full max-w-4xl mx-auto p-6">
@@ -62,23 +112,38 @@ export function NewClientForm({ onSubmit, onCancel }: NewClientFormProps) {
             Please fill out all required information to register a new client.
           </p>
         </div>
+        
+        <AnimatePresence mode="wait">
+          {renderFormStatus()}
+        </AnimatePresence>
 
         <FormProgress
           currentSection={state.currentSection}
-          sections={state.sections}
-          sectionTitles={state.sectionTitles}
+          sections={sectionConfig.sections as FormSection[]}
+          sectionTitles={sectionConfig.sectionTitles}
         />
 
-        <form onSubmit={form.handleSubmit(handleNext)} className="space-y-6" noValidate>
-          {renderSection()}
+        <motion.div
+          key={state.currentSection}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -20 }}
+          transition={{ duration: 0.3 }}
+        >
+          <form className="space-y-6" noValidate>
+            {renderSection()}
 
-          <FormActions
-            isSubmitting={form.formState.isSubmitting}
-            onSubmit={handleFormSubmit}
-            onCancel={onCancel}
-            isFormValid={form.formState.isValid}
-          />
-        </form>
+            <FormActions
+              isSubmitting={state.isSubmitting}
+              isLastStep={state.currentSection === sectionConfig.sections[sectionConfig.sections.length - 1]}
+              onNext={handleNext}
+              onPrevious={handlePrevious}
+              onSubmit={handleFormSubmit}
+              onCancel={onCancel}
+              isFormValid={form.formState.isValid}
+            />
+          </form>
+        </motion.div>
       </div>
     </Card>
   );

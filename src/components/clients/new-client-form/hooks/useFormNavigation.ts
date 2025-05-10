@@ -1,39 +1,46 @@
 'use client';
 
 import { useCallback } from 'react';
+import type { FormSection } from '../types';
 
 interface UseFormNavigationProps {
-  sections: string[];
-  currentSection: string;
-  setCurrentSection: (section: string) => void;
-  isFormValid: boolean;
-  isSubmitting: boolean;
-  onSubmit: () => void;
+  sections: FormSection[];
+  currentSection: FormSection;
+  updateCurrentSection: (section: FormSection) => void;
+  isFormValid?: boolean;
+  isSubmitting?: boolean;
+  onSubmit?: () => void;
 }
 
 export function useFormNavigation({
   sections,
   currentSection,
-  setCurrentSection,
-  isFormValid,
-  isSubmitting,
-  onSubmit
+  updateCurrentSection,
+  isFormValid = true,
+  isSubmitting = false,
+  onSubmit = () => {}
 }: UseFormNavigationProps) {
   const handleNext = useCallback(() => {
     const currentIndex = sections.indexOf(currentSection);
     if (currentIndex < sections.length - 1) {
-      setCurrentSection(sections[currentIndex + 1]);
-    } else {
+      updateCurrentSection(sections[currentIndex + 1]);
+    } else if (isFormValid && !isSubmitting) {
       onSubmit();
     }
-  }, [currentSection, setCurrentSection, sections, onSubmit]);
+  }, [currentSection, updateCurrentSection, sections, onSubmit, isFormValid, isSubmitting]);
 
   const handlePrevious = useCallback(() => {
     const currentIndex = sections.indexOf(currentSection);
     if (currentIndex > 0) {
-      setCurrentSection(sections[currentIndex - 1]);
+      updateCurrentSection(sections[currentIndex - 1]);
     }
-  }, [currentSection, setCurrentSection, sections]);
+  }, [currentSection, updateCurrentSection, sections]);
+  
+  const goToSection = useCallback((section: FormSection) => {
+    if (sections.includes(section)) {
+      updateCurrentSection(section);
+    }
+  }, [sections, updateCurrentSection]);
 
-  return { handleNext, handlePrevious };
+  return { handleNext, handlePrevious, goToSection };
 }

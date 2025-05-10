@@ -7,7 +7,7 @@ export type NewClientFormData = {
   contact: ContactInfo;
   employment: EmploymentInfo;
   identification: IdentificationInfo;
-  documentFile: File | null;
+  documents: DocumentsInfo;
 };
 
 export type PersonalInfo = {
@@ -41,10 +41,16 @@ export type EmploymentInfo = {
 };
 
 export type IdentificationInfo = {
-  idType: 'passport' | 'national_id' | 'drivers_license' | 'other';
+  idType: 'passport' | 'national_id' | 'driver_license' | 'residence_permit' | 'other';
   idNumber: string;
-  issueDate: Date;
-  expiryDate: Date;
+  idExpiryDate: Date;
+  documentFile: File | string | null;
+};
+
+export type DocumentsInfo = {
+  proofOfAddress: File | string | null;
+  financialDocuments: File | string | null;
+  additionalDocuments: File | string | null;
 };
 
 // Form section types
@@ -78,7 +84,12 @@ export type Gender = {
 
 // Form props
 export interface NewClientFormProps {
-  onSubmit: (data: NewClientFormData, metadata: { documentFile: File | null }) => Promise<void>;
+  onSubmit: (data: NewClientFormData, files: {
+    identificationDocument: File | string | null;
+    proofOfAddress: File | string | null;
+    financialDocuments: File | string | null;
+    additionalDocuments: File | string | null;
+  }) => Promise<void>;
   onCancel: () => void;
   isLoading?: boolean;
   initialData?: Partial<NewClientFormData>;
