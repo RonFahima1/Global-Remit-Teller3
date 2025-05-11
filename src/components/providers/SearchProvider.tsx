@@ -7,6 +7,7 @@ import {
   getRecentSearches, 
   clearRecentSearches as clearRecentSearchesService
 } from '@/services/searchService';
+import { getPageNameFromUrl } from '@/utils/pageNames';
 import { saveSearchQuery } from '@/services/search/utils';
 import { 
   trackSearch, 
@@ -115,12 +116,13 @@ export function SearchProvider({ children }: { children: ReactNode }) {
       isOpen: false
     }));
     
-    // Save the query to recent searches
-    if (state.query.trim()) {
-      saveSearchQuery(state.query);
+    // Save the page name to recent searches
+    if (result.url) {
+      const pageName = getPageNameFromUrl(result.url);
+      saveSearchQuery(pageName);
       
       // Track the result click for analytics
-      trackResultClick(state.query, result);
+      trackResultClick(pageName, result);
       
       setState(prev => ({
         ...prev,

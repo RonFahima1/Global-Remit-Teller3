@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useRouter, usePathname } from 'next/navigation';
 import { UnifiedSearchUI } from "./UnifiedSearchUI";
 import { useSearch } from "@/components/providers/SearchProvider";
+import { SearchSuggestion } from "@/components/commands/search/types";
 import { SearchFilters } from "./SearchFilters";
 
 // Quick action commands
@@ -104,8 +105,8 @@ export function CommandPalette() {
   }, [handleResultSelect, toggleSearchPanel]);
   
   // Close search panel after selecting a suggestion
-  const handleSuggestionWithClose = useCallback((suggestion: string) => {
-    useSuggestion(suggestion);
+  const handleSuggestionWithClose = useCallback((suggestion: SearchSuggestion) => {
+    useSuggestion(suggestion.text);
     // Give a slight delay to allow navigation to complete before closing
     setTimeout(() => toggleSearchPanel(), 100);
   }, [useSuggestion, toggleSearchPanel]);

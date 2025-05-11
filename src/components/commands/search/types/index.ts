@@ -1,11 +1,17 @@
 import { SearchResult } from '@/types/search.types';
 
-export interface SuggestionItem {
-  text: string;
-  type: 'suggestion' | 'page';
+export interface SearchSuggestion {
+  title: string;
+  description?: string;
+  icon: string;
+  type: 'page' | 'suggestion';
   url?: string;
-  icon?: string;
+  action?: () => void;
+  category: string;
+  text: string;
 }
+
+export interface SuggestionItem extends SearchSuggestion {};
 
 export interface QuickAction {
   label: string;
@@ -83,7 +89,7 @@ export interface UnifiedSearchUIProps {
   selectedIndex: number;
   recentSearches: string[];
   popularSearches?: string[];
-  onSelectSuggestion: (suggestion: string) => void;
+  onSelectSuggestion: (suggestion: SearchSuggestion) => void;
   onResultSelect: (result: SearchResult) => void;
   onRecentSearchSelect: (query: string) => void;
   onClearRecentSearches: () => void;

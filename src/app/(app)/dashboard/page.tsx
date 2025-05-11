@@ -85,7 +85,7 @@ export default function DashboardPage() {
   const { user } = useAuth();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white to-gray-100 dark:from-[#18181c] dark:to-[#23232a] p-2 sm:p-4 md:p-8 font-['-apple-system','BlinkMacSystemFont','SF Pro Text',sans-serif] flex flex-col items-center">
+    <div className="min-h-screen bg-background dark:bg-gray-900 p-2 sm:p-4 md:p-8 font-['-apple-system','BlinkMacSystemFont','SF Pro Text',sans-serif] flex flex-col items-center">
       {(isLoading || navLoading) && <LoadingOverlay />}
       {isLoading ? (
         <div className="w-full max-w-6xl mx-auto flex items-center justify-center min-h-[400px]">
