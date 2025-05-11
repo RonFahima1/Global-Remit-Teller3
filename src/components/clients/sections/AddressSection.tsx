@@ -1,22 +1,43 @@
 import { useFormContext } from '../context/FormContext';
-import { FormCard } from '../components/FormCard';
-import { CountryField } from '../fields/address/CountryField';
-import { StreetAddressField } from '../fields/address/StreetAddressField';
-import { CityField } from '../fields/address/CityField';
-import { PostalCodeField } from '../fields/address/PostalCodeField';
+import { FormField } from '../components/FormField';
+import { CountrySelect } from '../fields/CountrySelect';
 
 export function AddressSection() {
+  const { form } = useFormContext();
+
   return (
-    <FormCard 
-      title="Address Information" 
-      className="h-full flex flex-col"
-    >
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-grow">
-        <CountryField />
-        <StreetAddressField />
-        <CityField />
-        <PostalCodeField />
-      </div>
-    </FormCard>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <FormField
+        name="address.street"
+        label="Street Address *"
+        control={form.control}
+        required
+      />
+      <FormField
+        name="address.city"
+        label="City *"
+        control={form.control}
+        required
+      />
+      <FormField
+        name="address.state"
+        label="State/Province *"
+        control={form.control}
+        required
+      />
+      <FormField
+        name="address.postalCode"
+        label="Postal Code *"
+        control={form.control}
+        required
+      />
+      <CountrySelect
+        name="address.country"
+        label="Country *"
+        control={form.control}
+        required
+        className="col-span-2"
+      />
+    </div>
   );
 }

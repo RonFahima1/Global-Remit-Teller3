@@ -1,22 +1,26 @@
 import { useFormContext } from '../context/FormContext';
 import { FormCard } from '../components/FormCard';
-import { EmailField } from '../fields/contact/EmailField';
-import { PhoneField } from '../fields/contact/PhoneField';
+import { FormField } from '../components/FormField';
+import { PhoneInput } from '../fields/PhoneInput';
 
 export function ContactSection() {
+  const { form } = useFormContext();
+
   return (
-    <FormCard 
-      title="Contact Information" 
-      className="h-full flex flex-col"
-    >
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col gap-4">
-          <EmailField />
-        </div>
-        <div className="flex flex-col gap-4">
-          <PhoneField />
-        </div>
-      </div>
-    </FormCard>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <FormField
+        name="contact.email"
+        label="Email Address *"
+        control={form.control}
+        type="email"
+        required
+      />
+      <PhoneInput
+        name="contact.phone"
+        label="Phone Number *"
+        control={form.control}
+        required
+      />
+    </div>
   );
 }

@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { clientSchema as newClientSchema } from '../schemas';
+import { clientSchema } from '../schemas';
 import { NewClientFormData, FormState, FormSection, DocumentType, FileData } from '../types/form';
 
 interface FormContextType {
@@ -46,28 +46,28 @@ export function FormProvider({ children }: { children: React.ReactNode }) {
       firstName: '',
       middleName: '',
       lastName: '',
-      dob: '',
+      nationality: '',
       gender: 'male',
-      nationality: ''
+      dob: ''
     },
     address: {
-      street: '',
+      country: '',
+      streetAddress: '',
       city: '',
-      state: '',
-      postalCode: '',
-      country: ''
+      postalCode: ''
     },
     contact: {
       email: '',
-      phoneNumber: '',
-      areaCode: ''
-    },
-    document: {
-      idType: 'passport',
-      idNumber: ''
+      phone: {
+        country: '',
+        number: '',
+        areaCode: ''
+      },
+      customerCard: ''
     },
     identification: {
       idType: 'passport',
+      issuanceCountry: '',
       idNumber: '',
       issueDate: '',
       expiryDate: ''
@@ -75,13 +75,18 @@ export function FormProvider({ children }: { children: React.ReactNode }) {
     employment: {
       occupation: '',
       employer: '',
-      income: 0
+      income: ''
+    },
+    documents: {
+      idFront: null,
+      idBack: null,
+      proofOfAddress: null
     }
   };
 
   const form = useForm<NewClientFormData>({
-    resolver: zodResolver(newClientSchema),
-    defaultValues,
+    resolver: zodResolver(clientSchema),
+    defaultValues: defaultValues as NewClientFormData,
     mode: 'onChange'
   });
 
@@ -111,14 +116,14 @@ export function FormProvider({ children }: { children: React.ReactNode }) {
     };
     
     // Map document types to form fields
-    const documentTypeMap: Record<DocumentType, keyof NewClientFormData> = {
-      idFront: 'document',
-      idBack: 'document',
-      proofOfAddress: 'identification'
+    const documentTypeMap: Record<DocumentType, string> = {
+      idFront: 'documents.idFront',
+      idBack: 'documents.idBack',
+      proofOfAddress: 'documents.proofOfAddress'
     };
 
     // Set the file data in the form
-    form.setValue(`${documentTypeMap[type]}.fileData`, fileData);
+    form.setValue(documentTypeMap[type], fileData as FileData);
     setState(prev => ({
       ...prev,
       fileUploads: {
@@ -129,11 +134,11 @@ export function FormProvider({ children }: { children: React.ReactNode }) {
   };
 
   const handleFileRemove = (type: DocumentType) => {
-    const currentFile = form.getValues(`${documentTypeMap[type]}.fileData`) as FileData;
+    const currentFile = form.getValues(documentTypeMap[type]) as FileData;
     if (currentFile && currentFile.previewUrl) {
       URL.revokeObjectURL(currentFile.previewUrl);
     }
-    form.setValue(`${documentTypeMap[type]}.fileData`, undefined);
+    form.setValue(documentTypeMap[type], null);
     setState(prev => ({
       ...prev,
       fileUploads: {

@@ -1,6 +1,7 @@
-import { ReactNode } from 'react';
-import { useFormContext } from '../../context/FormContext';
-import { FormField } from '../../components/FormField';
+                   import React, { ReactNode } from 'react';
+import { useFormContext } from '../context/FormContext';
+import { FormField } from './FormField';
+import { DocumentType, NewClientFormData } from '../types/form';
 
 interface FormFieldWrapperProps {
   name: string;
@@ -12,9 +13,10 @@ interface FormFieldWrapperProps {
   isFileUpload?: boolean;
   accept?: string;
   maxSize?: number;
+  error?: string;
 }
 
-export function FormFieldWrapper({
+export const FormFieldWrapper: React.FC<FormFieldWrapperProps> = ({
   name,
   label,
   children,
@@ -24,10 +26,13 @@ export function FormFieldWrapper({
   isFileUpload = false,
   accept,
   maxSize
-}: FormFieldWrapperProps) {
+}) => {
   const { form, state, handleFileUpload, handleFileRemove } = useFormContext();
-  const error = form.formState.errors[name]?.message;
-  const fileError = state.errors[name];
+  const error = form.formState.errors[name as string];
+  const fileError = state.errors[name as keyof typeof state.errors];
+
+  const errorMessage = error ? (error as any).message : null;
+  const fileErrorMessage = fileError ? (fileError as any) : null;
 
   return (
     <div className={`space-y-1 ${className}`}>
@@ -38,15 +43,15 @@ export function FormFieldWrapper({
       {isFileUpload ? (
         <div className="flex flex-col gap-2">
           {children}
-          {state.fileUploads[name as keyof typeof state.fileUploads] && (
+          {state.fileUploads[name as DocumentType] && (
             <div className="flex items-center gap-2">
               <img
-                src={state.fileUploads[name as keyof typeof state.fileUploads]?.previewUrl}
+                src={state.fileUploads[name as DocumentType]?.previewUrl}
                 alt="Uploaded document"
                 className="w-20 h-20 object-cover rounded"
               />
               <button
-                onClick={() => handleFileRemove(name as keyof typeof state.fileUploads)}
+                onClick={() => handleFileRemove(name as DocumentType)}
                 className="text-red-500 hover:text-red-700"
                 type="button"
               >
@@ -61,15 +66,15 @@ export function FormFieldWrapper({
             name={name}
             label=""
             control={form.control}
-            error={error}
+            error={errorMessage}
             disabled={disabled}
           />
         )
       )}
 
-      {(error || fileError) && (
+      {(errorMessage || fileErrorMessage) && (
         <p className="mt-1 text-sm text-red-600">
-          {error || fileError}
+          {errorMessage || fileErrorMessage}
         </p>
       )}
     </div>

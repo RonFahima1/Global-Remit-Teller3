@@ -1,9 +1,10 @@
-import { useFormContext } from '../../context/FormContext';
+import { useFormContext } from '../context/FormContext';
 import { FormFieldWrapper } from '../components/FormFieldWrapper';
 import { FormField } from '../components/FormField';
+import { DocumentType, NewClientFormData } from '../types/form';
 
 interface BaseFieldProps {
-  name: string;
+  name: keyof NewClientFormData | DocumentType;
   label: string;
   className?: string;
   required?: boolean;
@@ -20,7 +21,7 @@ export function BaseField({
   children
 }: BaseFieldProps) {
   const { form } = useFormContext();
-  const error = form.formState.errors[name]?.message;
+  const error = form.formState.errors[name as keyof NewClientFormData]?.message;
 
   return (
     <FormFieldWrapper
@@ -34,6 +35,7 @@ export function BaseField({
       {children || (
         <FormField
           name={name}
+          label={label}
           control={form.control}
           error={error}
           disabled={disabled}

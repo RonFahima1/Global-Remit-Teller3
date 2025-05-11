@@ -20,8 +20,8 @@ export function Logo({
   const [isSpinning, setIsSpinning] = React.useState(false);
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
     if (onClick) {
-      e.preventDefault();
       onClick();
     }
     setIsSpinning(true);
@@ -39,7 +39,10 @@ export function Logo({
         isDark ? 'text-white' : 'text-blue-600',
         className
       )}
-      onClick={handleClick}
+      onClick={(e) => {
+        e.preventDefault();
+        handleClick(e);
+      }}
     >
       <div className={cn(
         'relative inline-block transition-transform duration-200',

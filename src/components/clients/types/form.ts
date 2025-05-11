@@ -26,28 +26,35 @@ export interface FormState {
   successMessage?: string;
 }
 
+export type IdType = 'passport' | 'national_id' | 'drivers_license';
+
+export type Gender = 'male' | 'female' | 'other';
+
 export interface NewClientFormData {
   personal: {
     firstName: string;
     middleName?: string;
     lastName: string;
     nationality: string;
-    gender: 'male' | 'female' | 'other';
+    gender: Gender;
     dob: string;
   };
   address: {
     country: string;
     streetAddress: string;
     city: string;
-    postalCode: string;
+    postalCode?: string;
   };
   contact: {
     email: string;
-    phoneNumber: string;
+    prefix: string;
+    phone: string;
     areaCode: string;
+    customerCard?: string;
   };
   identification: {
-    idType: 'passport' | 'national_id' | 'drivers_license';
+    idType: IdType;
+    issuanceCountry: string;
     idNumber: string;
     issueDate: string;
     expiryDate: string;

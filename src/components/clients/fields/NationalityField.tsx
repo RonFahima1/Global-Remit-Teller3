@@ -1,6 +1,6 @@
 import { useFormContext } from '../context/FormContext';
-import { FormField } from '../components/FormField';
 import { COUNTRIES } from '../constants/countries';
+import { FormField } from '../components/FormField';
 
 export function NationalityField() {
   const { form } = useFormContext();
@@ -10,7 +10,7 @@ export function NationalityField() {
       name="personal.nationality"
       label="Nationality"
       control={form.control}
-      error={form.formState.errors.personal?.nationality?.message}
+      required
       as="select"
       options={COUNTRIES.map(country => ({
         value: country.value,
