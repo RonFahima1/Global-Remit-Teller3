@@ -1,18 +1,16 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, Check, ChevronRight, User, Users, FileText, DollarSign, CheckCircle, Shield, Printer } from 'lucide-react';
+import { User, Users, FileText, DollarSign, CheckCircle, ArrowLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { ConfettiSuccess } from '@/components/ui/ConfettiSuccess';
-import { useSendMoneyForm } from './hooks/useSendMoneyForm';
+import { TransferProvider, useTransfer } from '@/context/transfer-context';
 import { SenderSelection } from './components/SenderSelection';
 import { ReceiverSelection } from './components/ReceiverSelection';
 import { TransferDetails } from './components/TransferDetails';
 import { AmountEntry } from './components/AmountEntry';
-import { ConfirmationStep } from './components/ConfirmationStep';
-import { ProgressIndicator } from './components/ProgressIndicator';
+import { Confirmation } from './components/Confirmation';
+import { Button } from '@/components/ui/button';
 
 // Define step interfaces
 interface Step {
@@ -23,39 +21,18 @@ interface Step {
   description: string;
 }
 
+// Main component wrapper with TransferProvider
 export default function SendMoneyPage() {
-  const {
-    steps: formSteps,
-    activeStep,
-    navigationDirection,
-    transferComplete,
-    showSuccessMessage,
-    isSubmitting,
-    initialLoading,
-    errors,
-    searchQuery,
-    setSearchQuery,
-    selectedSender,
-    setSelectedSender,
-    selectedReceiver,
-    setSelectedReceiver,
-    showNewSenderForm,
-    setShowNewSenderForm,
-    showNewReceiverForm,
-    setShowNewReceiverForm,
-    formData,
-    setFormData,
-    filteredClients,
-    handleNavigation,
-    canProceed,
-    handleInputChange,
-    handleSelectChange,
-    handleCheckboxChange,
-    calculateFee,
-    calculateRecipientAmount,
-    calculateTotalAmount,
-    handleSendAnother
-  } = useSendMoneyForm();
+  return (
+    <TransferProvider>
+      <SendMoneyContent />
+    </TransferProvider>
+  );
+}
+
+// Content component that uses the TransferContext
+function SendMoneyContent() {
+  const { state, dispatch } = useTransfer();
   
   // Define our steps with icons and colors
   const steps: Step[] = [
@@ -75,17 +52,17 @@ export default function SendMoneyPage() {
     },
     { 
       id: 3, 
-      title: 'Details', 
-      icon: <FileText className="h-5 w-5" />, 
-      color: 'bg-purple-500',
-      description: 'Provide details about your transfer'
-    },
-    { 
-      id: 4, 
       title: 'Amount', 
       icon: <DollarSign className="h-5 w-5" />, 
       color: 'bg-amber-500',
       description: 'Enter the amount you want to send'
+    },
+    { 
+      id: 4, 
+      title: 'Details', 
+      icon: <FileText className="h-5 w-5" />, 
+      color: 'bg-purple-500',
+      description: 'Provide details about your transfer'
     },
     { 
       id: 5, 
@@ -109,215 +86,161 @@ export default function SendMoneyPage() {
   }, []);
   
   // Calculate progress percentage
-  const progressPercentage = Math.round((activeStep / steps.length) * 100);
+  const progressPercentage = Math.round((state.step / steps.length) * 100);
   
-  // Add event listener for form submission from ConfirmationStep
-  useEffect(() => {
-    const handleFormSubmit = () => {
-      if (activeStep === 5 && formData.termsAccepted && !isSubmitting) {
-        // Trigger the next step navigation which will call handleSubmit() in the hook
-        handleNavigation('next');
-      }
-    };
-    
-    window.addEventListener('submit-form', handleFormSubmit);
-    return () => window.removeEventListener('submit-form', handleFormSubmit);
-  }, [activeStep, formData.termsAccepted, isSubmitting, handleNavigation]);
+  // Function to go to a specific step
+  const goToStep = (step: number) => {
+    if (step < state.step) {
+      dispatch({ type: 'SET_STEP', payload: step });
+    }
+  };
+  
+  // Handle next step
+  const handleNextStep = () => {
+    dispatch({ type: 'NEXT_STEP' });
+  };
+  
+  // Handle previous step
+  const handlePrevStep = () => {
+    dispatch({ type: 'PREV_STEP' });
+  };
   
   // Render the current step content
   const renderStepContent = () => {
-    switch (activeStep) {
+    switch (state.step) {
       case 1:
-        return (
-          <SenderSelection
-            initialLoading={initialLoading}
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
-            filteredClients={filteredClients}
-            selectedSender={selectedSender}
-            setSelectedSender={setSelectedSender}
-            setShowNewSenderForm={setShowNewSenderForm}
-          />
-        );
+        return <SenderSelection />;
       case 2:
-        return (
-          <ReceiverSelection
-            initialLoading={initialLoading}
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
-            filteredClients={filteredClients}
-            selectedReceiver={selectedReceiver}
-            setSelectedReceiver={setSelectedReceiver}
-            setShowNewReceiverForm={setShowNewReceiverForm}
-          />
-        );
+        return <ReceiverSelection />;
       case 3:
-        return (
-          <TransferDetails
-            formData={formData}
-            handleSelectChange={handleSelectChange}
-            errors={errors}
-          />
-        );
+        return <AmountEntry />;
       case 4:
-        return (
-          <AmountEntry
-            formData={formData}
-            handleInputChange={handleInputChange}
-            calculateFee={calculateFee}
-            calculateRecipientAmount={calculateRecipientAmount}
-            calculateTotalAmount={calculateTotalAmount}
-            errors={errors}
-          />
-        );
+        return <TransferDetails />;
       case 5:
-        return (
-          <ConfirmationStep
-            formData={formData}
-            selectedSender={selectedSender}
-            selectedReceiver={selectedReceiver}
-            handleCheckboxChange={handleCheckboxChange}
-            isSubmitting={isSubmitting}
-            errors={errors}
-            transferComplete={transferComplete}
-            handleSendAnother={handleSendAnother}
-            calculateFee={calculateFee}
-            calculateRecipientAmount={calculateRecipientAmount}
-            calculateTotalAmount={calculateTotalAmount}
-          />
-        );
+        return <Confirmation />;
       default:
         return null;
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse space-y-4 w-full max-w-md">
+          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded-md w-1/3 mx-auto"></div>
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded-md w-2/3 mx-auto"></div>
+          <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded-lg mt-8"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 dark:from-gray-950 dark:to-gray-900">
-      {/* Header - iOS Style */}
-      <header className="sticky top-0 z-50 bg-white/90 dark:bg-gray-950/90 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center">
-            {activeStep > 1 && (
-              <motion.button 
-                onClick={() => handleNavigation('back')}
-                className="mr-3 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-300" />
-              </motion.button>
-            )}
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Send Money</h1>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              Step {activeStep} of {steps.length}
+    <div className="min-h-screen bg-background">
+      <main className="container mx-auto px-4 py-6">
+        {/* Progress Bar */}
+        <div className="mb-8 max-w-3xl mx-auto">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-lg font-medium">
+              {steps[state.step - 1]?.title}
+            </h2>
+            <span className="text-sm text-muted-foreground">
+              Step {state.step} of {steps.length}
             </span>
           </div>
-        </div>
-      </header>
-      
-      {/* Enhanced Progress bar - iOS Style */}
-      <div className="h-2 bg-gray-100 dark:bg-gray-800 w-full overflow-hidden">
-        <motion.div 
-          className="h-full bg-gradient-to-r from-blue-500 to-blue-600" 
-          initial={{ width: 0, x: -20 }}
-          animate={{ width: `${progressPercentage}%`, x: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-          style={{
-            boxShadow: "0 0 8px rgba(59, 130, 246, 0.5)"
-          }}
-        />
-      </div>
-      
-      {/* Main content - Responsive Layout for Larger Screens with reduced padding */}
-      <main className="container mx-auto px-4 py-4 pb-16 flex flex-col lg:flex-row lg:gap-6 lg:items-start">
-        {isLoading || initialLoading ? (
-          <div className="max-w-3xl mx-auto">
-            <div className="animate-pulse space-y-4">
-              <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded-md w-1/3 mx-auto"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded-md w-2/3 mx-auto"></div>
-              <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded-lg mt-8"></div>
-            </div>
+          
+          {/* Progress bar */}
+          <div className="h-2 bg-muted rounded-full overflow-hidden">
+            <motion.div 
+              className="h-full bg-primary"
+              initial={{ width: `${Math.round(((state.step - 1) / steps.length) * 100)}%` }}
+              animate={{ width: `${progressPercentage}%` }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+            />
           </div>
-        ) : (
-          <div className="flex flex-col max-w-7xl mx-auto">
-            {/* Horizontal Progress Indicator - iOS Style */}
-            <ProgressIndicator steps={steps} activeStep={activeStep} />
-            
-            {/* Step content */}
-            <div className="w-full">
-              <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6 mb-8">
-                
-                {/* Render the active step component */}
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={activeStep}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    {renderStepContent()}
-                  </motion.div>
-                </AnimatePresence>
-              </div>
-              
-              {/* Navigation buttons */}
-              <div className="flex flex-col sm:flex-row gap-4 justify-end">
-                {activeStep > 1 && (
-                  <Button
-                    onClick={() => handleNavigation('back')}
-                    variant="outline"
-                    className="rounded-xl border-gray-300 dark:border-gray-700 order-2 sm:order-1"
-                  >
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back
-                  </Button>
-                )}
-                
-                {activeStep < steps.length && (
-                  <motion.div
-                    whileHover={{ scale: canProceed ? 1.01 : 1 }}
-                    whileTap={{ scale: canProceed ? 0.98 : 1 }}
-                    className="order-1 sm:order-2"
-                  >
-                    <Button
-                      onClick={() => handleNavigation('next')}
-                      className={cn(
-                        "rounded-xl w-full sm:w-auto",
-                        !canProceed ? "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed" :
-                        "bg-blue-500 hover:bg-blue-600 text-white"
-                      )}
-                      disabled={!canProceed || isSubmitting}
+          
+          {/* Step indicators */}
+          <div className="flex justify-between mt-4">
+            {steps.map((step) => (
+              <div 
+                key={step.id} 
+                className="flex flex-col items-center"
+                style={{ width: `${100 / steps.length}%` }}
+              >
+                <motion.div 
+                  className={cn(
+                    "h-10 w-10 rounded-full flex items-center justify-center transition-all",
+                    step.id < state.step ? "bg-success text-white" : 
+                    step.id === state.step ? "bg-primary text-white" : 
+                    "bg-muted text-muted-foreground"
+                  )}
+                  onClick={() => step.id < state.step && goToStep(step.id)}
+                  style={{ cursor: step.id < state.step ? 'pointer' : 'default' }}
+                  whileHover={step.id < state.step ? { scale: 1.05 } : {}}
+                  whileTap={step.id < state.step ? { scale: 0.95 } : {}}
+                >
+                  {step.id < state.step ? (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
                     >
-                      Next
-                      <ChevronRight className="h-4 w-4 ml-2" />
-                    </Button>
-                  </motion.div>
-                )}
+                      {step.icon}
+                    </motion.div>
+                  ) : (
+                    <span className="text-sm font-medium">{step.id}</span>
+                  )}
+                </motion.div>
+                <span className={cn(
+                  "text-xs mt-2 text-center",
+                  step.id === state.step ? "text-foreground font-medium" : "text-muted-foreground"
+                )}>
+                  {step.title}
+                </span>
               </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* Step Content */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={state.step}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="max-w-3xl mx-auto"
+          >
+            {renderStepContent()}
+          </motion.div>
+        </AnimatePresence>
+        
+        {/* Bottom Navigation */}
+        {state.step !== 5 && (
+          <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border p-4 z-10">
+            <div className="container mx-auto flex justify-between items-center max-w-3xl">
+              <Button 
+                variant="outline"
+                onClick={handlePrevStep}
+                disabled={state.step === 1}
+                className="w-28"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back
+              </Button>
+              
+              <Button 
+                onClick={handleNextStep}
+                className="w-28"
+              >
+                Next
+                <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
             </div>
           </div>
         )}
       </main>
-      
-      {/* Success Message Overlay */}
-      <AnimatePresence>
-        {showSuccessMessage && (
-          <ConfettiSuccess
-            message="Transfer Successful!"
-            description={`Your money transfer has been processed successfully.`}
-            actionLabel="Go to Dashboard"
-            onActionClick={() => window.location.href = '/dashboard'}
-            onSendAnother={handleSendAnother}
-            amount={formData.amount}
-            currency={formData.currency || '$'}
-            receiverName={selectedReceiver?.name || 'Recipient'}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 }

@@ -7,10 +7,12 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { useClient } from "@/context/ClientContext";
 
 export default function NewClientPage() {
     const router = useRouter();
-    const { toast } = useToast(); // Get toast function
+    const { toast } = useToast();
+    const { createClientFromForm } = useClient();
     const [isLoading, setIsLoading] = useState(false);
 
     const onCancel = () => {
@@ -20,8 +22,9 @@ export default function NewClientPage() {
     const handleSubmit = async (data: NewClientFormData) => {
         setIsLoading(true);
         try {
-            // Here you would typically make an API call with the form data
-            console.log('Form submitted:', data);
+            // Create client using the ClientContext
+            createClientFromForm(data);
+            
             toast({
                 title: "Success",
                 description: "Client created successfully",

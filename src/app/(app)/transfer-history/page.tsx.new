@@ -1,0 +1,185 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { PlusCircle, Loader2, Calendar } from 'lucide-react';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TransferHistory, getTransferHistory } from '@/services/history-service';
+import { useToast } from '@/hooks/use-toast';
+import { TransferList } from './components/TransferList';
+import { TransferFilters } from './components/TransferFilters';
+import { TransferDetailsDialog } from './components/TransferDetailsDialog';
+import { RecentRecipients } from '@/components/transfer/RecentRecipients';
+
+export default function TransferHistoryPage() {
+  const { toast } = useToast();
+  const [transfers, setTransfers] = useState<TransferHistory[]>([]);
+  const [filteredTransfers, setFilteredTransfers] = useState<TransferHistory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedTransfer, setSelectedTransfer] = useState<TransferHistory | null>(null);
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+
+  // Fetch transfer history
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        setLoading(true);
+        const data = await getTransferHistory();
+        setTransfers(data);
+        setFilteredTransfers(data);
+      } catch (error) {
+        console.error('Failed to fetch transfer history:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load transfer history. Please try again.',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchHistory();
+  }, [toast]);
+
+  // Filter transfers based on search query and status filter
+  useEffect(() => {
+    let filtered = [...transfers];
+    
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (transfer) =>
+          transfer.receiver.name.toLowerCase().includes(query) ||
+          transfer.id.toLowerCase().includes(query) ||
+          transfer.purpose?.toLowerCase().includes(query) ||
+          transfer.reference?.toLowerCase().includes(query)
+      );
+    }
+    
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter((transfer) => transfer.status === statusFilter);
+    }
+    
+    setFilteredTransfers(filtered);
+  }, [transfers, searchQuery, statusFilter]);
+
+  // Handle transfer refresh after cancellation
+  const handleTransferCancelled = () => {
+    // Refresh the transfer list
+    const fetchHistory = async () => {
+      try {
+        const data = await getTransferHistory();
+        setTransfers(data);
+        setFilteredTransfers(data);
+      } catch (error) {
+        console.error('Failed to refresh transfer history:', error);
+      }
+    };
+    
+    fetchHistory();
+  };
+
+  // View transfer details
+  const viewTransferDetails = (transfer: TransferHistory) => {
+    setSelectedTransfer(transfer);
+    setShowDetailsDialog(true);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading transfer history...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Transfer History</h1>
+          <p className="text-muted-foreground">View and manage your money transfers</p>
+        </div>
+        
+        <Link href="/send-money">
+          <Button className="rounded-full gap-1">
+            <PlusCircle className="h-4 w-4" />
+            <span>New Transfer</span>
+          </Button>
+        </Link>
+      </div>
+      
+      <TransferFilters
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        statusFilter={statusFilter}
+        onStatusChange={setStatusFilter}
+      />
+
+      <Tabs defaultValue="all" className="mb-8">
+        <TabsList className="mb-4">
+          <TabsTrigger value="all">All Transfers</TabsTrigger>
+          <TabsTrigger value="recent">Recent Recipients</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="all" className="space-y-4">
+          {filteredTransfers.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="mx-auto w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+                <Calendar className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-medium mb-2">No transfers found</h3>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                No transfers match your current filters. Try adjusting your search criteria or create a new transfer.
+              </p>
+              <Button 
+                variant="outline" 
+                className="mt-4 rounded-full"
+                onClick={() => {
+                  setSearchQuery('');
+                  setStatusFilter('all');
+                }}
+              >
+                Clear Filters
+              </Button>
+            </div>
+          ) : (
+            <TransferList 
+              transfers={filteredTransfers} 
+              onViewDetails={viewTransferDetails}
+              onTransferCancelled={handleTransferCancelled}
+            />
+          )}
+        </TabsContent>
+        
+        <TabsContent value="recent">
+          <div className="mb-4">
+            <h3 className="text-lg font-medium mb-2">Quick Transfers</h3>
+            <p className="text-muted-foreground">
+              Send money again to your recent recipients with just a few clicks.
+            </p>
+          </div>
+          
+          <RecentRecipients showViewAll={false} limit={5} />
+        </TabsContent>
+      </Tabs>
+
+      {/* Transfer Details Dialog */}
+      <TransferDetailsDialog 
+        transfer={selectedTransfer} 
+        open={showDetailsDialog} 
+        onOpenChange={setShowDetailsDialog} 
+      />
+    </div>
+  );
+}

@@ -1,68 +1,88 @@
 'use client';
 
-import { useState, useEffect } from 'react'; // Import useState & useEffect
-import Link from 'next/link'; // Import Link
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { UserPlus, MoreHorizontal, Edit, Trash2, Eye } from 'lucide-react';
-import { CustomerSearch } from '@/components/customer/CustomerSearch'; // Fix: Use named import
-import type { Country } from '@/services/country-code'; // Import Country type
-import { getCountries } from '@/services/country-code'; // Import getCountries
-import { cn } from '@/lib/utils'; // Import cn
+import { MoreHorizontal, Edit, Trash2, Eye, Filter } from 'lucide-react';
+import { ClientSearch } from '@/components/clients/ClientSearch';
+import { useClient } from '@/context/ClientContext';
+import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
-
-// Mock Data
-const clients = [
-  { id: 'CUST001', name: 'John Doe', phone: '+44 7700 900123', email: 'john.doe@example.com', status: 'Active' },
-  { id: 'CUST002', name: 'Jane Smith', phone: '+972 50 123 4567', email: 'jane.s@mail.com', status: 'Active' },
-  { id: 'CUST003', name: 'David Lee', phone: '+44 7800 111222', email: 'david.lee@provider.net', status: 'Inactive' },
-  { id: 'CUST004', name: 'Sarah Chen', phone: '+972 54 987 6543', email: 's.chen@work.org', status: 'Active' },
-];
-
-// Mock search results state
-const initialClients = [ /* your initial client list here */ ];
 
 const getStatusPillClass = (status: string) => {
-  switch (status.toLowerCase()) {
+  switch (status?.toLowerCase()) {
     case 'active':
       return 'ios-status-pill-green';
     case 'inactive':
+    case 'rejected':
       return 'ios-status-pill-red';
+    case 'pending':
+      return 'ios-status-pill-yellow';
+    case 'verified':
+      return 'ios-status-pill-blue';
     default:
-      return 'ios-status-pill-gray'; // Use gray for other statuses
+      return 'ios-status-pill-gray';
   }
 };
 
 export default function ClientsPage() {
-    const [displayedClients, setDisplayedClients] = useState(clients); // State for filtered clients
-
+    const router = useRouter();
+    const { toast } = useToast();
+    const { state, searchClients, deleteClient, selectClient } = useClient();
+    const [kycFilter, setKycFilter] = useState<string>('all');
+    
+    // Format client name
+    const formatClientName = (firstName: string, lastName: string) => {
+        return `${firstName} ${lastName}`;
+    };
+    
+    // Get client status
+    const getClientStatus = (client: any) => {
+        return client.status || (client.kycStatus === 'verified' ? 'Active' : client.kycStatus);
+    };
+    
+    // Filter clients by KYC status
+    const filteredClients = state.filteredClients.filter(client => {
+        if (kycFilter === 'all') return true;
+        return client.kycStatus === kycFilter;
+    });
+    
     const handleClientSearch = (searchParams: any) => {
-        console.log("Searching for client (Clients Page):", searchParams);
-        // Mock filtering logic
-        const { type, value, countryCode } = searchParams;
-        const lowerCaseValue = value.toLowerCase();
-
-        const filtered = clients.filter(client => {
-            switch (type) {
-                case 'phone':
-                    // Remove non-digit characters for comparison if needed
-                    const phoneDigits = client.phone.replace(/\D/g, '');
-                    const searchDigits = (countryCode + value).replace(/\D/g, '');
-                    return phoneDigits.includes(value); // Simple substring match for now
-                case 'name':
-                    return client.name.toLowerCase().includes(lowerCaseValue);
-                case 'id':
-                    return client.id.toLowerCase().includes(lowerCaseValue);
-                 case 'email': // Add email search if needed in CustomerSearch
-                     return client.email?.toLowerCase().includes(lowerCaseValue);
-                // Add cases for other search types (bank, qr, card) if data exists
-                default:
-                    return true; // Should not happen if type is always set
-            }
-        });
-        setDisplayedClients(filtered);
+        console.log("Searching for client:", searchParams);
+        const { type, value } = searchParams;
+        
+        if (!value) {
+            searchClients('');
+            return;
+        }
+        
+        // Use the searchClients method from the context
+        searchClients(value);
+    };
+    
+    const handleViewClient = (client: any) => {
+        selectClient(client);
+        router.push(`/clients/${client.id}`);
+    };
+    
+    const handleEditClient = (client: any) => {
+        selectClient(client);
+        router.push(`/clients/${client.id}/edit`);
+    };
+    
+    const handleDeleteClient = (client: any) => {
+        if (confirm(`Are you sure you want to delete ${formatClientName(client.firstName, client.lastName)}?`)) {
+            deleteClient(client.id);
+            toast({
+                title: "Client deleted",
+                description: `${formatClientName(client.firstName, client.lastName)} has been deleted.`,
+            });
+        }
     };
 
 
@@ -72,22 +92,52 @@ export default function ClientsPage() {
         <h1 className="text-h1 font-h1 text-foreground">Clients</h1>
       </div>
 
-      {/* Customer Search Card */}
+      {/* Client Search Card */}
       <Card className="card-ios">
         <CardHeader>
           <CardTitle className="text-h3 font-h3 text-card-foreground">Search Clients</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <CustomerSearch
-            onSearch={handleClientSearch}
+          <ClientSearch 
+            placeholder="Search by name, phone, email..."
+            autoFocus={true}
             showNewButton={true}
-            newButtonText="New Client"
-            newButtonLink="/clients/new"
-            defaultTab="phone"
           />
         </CardContent>
       </Card>
 
+      {/* KYC Filter */}
+      <div className="flex gap-2 mb-4">
+        <Button 
+          variant={kycFilter === 'all' ? 'default' : 'outline'}
+          onClick={() => setKycFilter('all')}
+          className="text-sm"
+        >
+          All
+        </Button>
+        <Button 
+          variant={kycFilter === 'verified' ? 'default' : 'outline'}
+          onClick={() => setKycFilter('verified')}
+          className="text-sm"
+        >
+          Verified
+        </Button>
+        <Button 
+          variant={kycFilter === 'pending' ? 'default' : 'outline'}
+          onClick={() => setKycFilter('pending')}
+          className="text-sm"
+        >
+          Pending
+        </Button>
+        <Button 
+          variant={kycFilter === 'rejected' ? 'default' : 'outline'}
+          onClick={() => setKycFilter('rejected')}
+          className="text-sm"
+        >
+          Rejected
+        </Button>
+      </div>
+      
       {/* Client List Table */}
       <Card className="card-ios">
         <CardHeader>
@@ -107,16 +157,16 @@ export default function ClientsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {displayedClients.length > 0 ? (
-                  displayedClients.map((client) => (
+                {filteredClients.length > 0 ? (
+                  filteredClients.map((client) => (
                     <TableRow key={client.id} className="hover:bg-muted/50 transition-colors">
                       <TableCell className="font-medium">{client.id}</TableCell>
-                      <TableCell>{client.name}</TableCell>
-                      <TableCell>{client.phone}</TableCell>
-                      <TableCell>{client.email}</TableCell>
+                      <TableCell>{formatClientName(client.firstName, client.lastName)}</TableCell>
+                      <TableCell>{client.contact.phone}</TableCell>
+                      <TableCell>{client.contact.email}</TableCell>
                       <TableCell>
-                        <span className={`ios-status-pill ${getStatusPillClass(client.status)}`}>
-                          {client.status}
+                        <span className={`ios-status-pill ${getStatusPillClass(getClientStatus(client))}`}>
+                          {getClientStatus(client)}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
@@ -128,15 +178,18 @@ export default function ClientsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-[160px]">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleViewClient(client)}>
                               <Eye className="mr-2 h-4 w-4" />
                               <span>View Details</span>
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditClient(client)}>
                               <Edit className="mr-2 h-4 w-4" />
                               <span>Edit</span>
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-600 dark:text-red-400">
+                            <DropdownMenuItem 
+                              className="text-red-600 dark:text-red-400"
+                              onClick={() => handleDeleteClient(client)}
+                            >
                               <Trash2 className="mr-2 h-4 w-4" />
                               <span>Delete</span>
                             </DropdownMenuItem>

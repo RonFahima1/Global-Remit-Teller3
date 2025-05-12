@@ -10,20 +10,294 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// User and Authentication Models
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  password      String
-  role          String    @default("USER")
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  lastLogin     DateTime?
-  status        String    @default("ACTIVE")
-  failedAttempts Int      @default(0)
+  id             String    @id @default(cuid())
+  name           String?
+  email          String    @unique
+  password       String
+  role           String    @default("USER")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  lastLogin      DateTime?
+  status         String    @default("ACTIVE")
+  failedAttempts Int       @default(0)
+  phoneNumber    String?
+  address        String?
+  branchId       String?
+  agentId        String?
+  profileImage   String?
+  branch         Branch?   @relation(fields: [branchId], references: [id])
+  agent          Agent?    @relation(fields: [agentId], references: [id])
+  transactions   Transaction[]
+  cashRegister   CashRegister?
   
   @@index([email, createdAt])
   @@index([role, status])
   @@index([createdAt])
   @@index([updatedAt])
-} 
+}
+
+// Client Models
+model Client {
+  id                String    @id @default(cuid())
+  firstName         String
+  lastName          String
+  email             String?
+  phoneNumber       String
+  dateOfBirth       DateTime?
+  nationality       String?
+  address           String?
+  city              String?
+  country           String
+  postalCode        String?
+  idType            String?
+  idNumber          String?
+  idExpiryDate      DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  status            String    @default("ACTIVE")
+  kycStatus         String    @default("PENDING")
+  kycVerifiedAt     DateTime?
+  occupation        String?
+  employerName      String?
+  monthlyIncome     Float?
+  sourceOfFunds     String?
+  profileImage      String?
+  documents         Document[]
+  sentTransactions  Transaction[] @relation("SenderTransactions")
+  receivedTransactions Transaction[] @relation("ReceiverTransactions")
+  clientAccounts    ClientAccount[]
+  
+  @@index([firstName, lastName])
+  @@index([phoneNumber])
+  @@index([idNumber])
+  @@index([kycStatus])
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  clientId    String
+  type        String   // ID, PROOF_OF_ADDRESS, PROOF_OF_INCOME, etc.
+  fileUrl     String
+  fileName    String
+  fileSize    Int
+  mimeType    String
+  uploadedAt  DateTime @default(now())
+  verifiedAt  DateTime?
+  status      String   @default("PENDING") // PENDING, VERIFIED, REJECTED
+  notes       String?
+  client      Client   @relation(fields: [clientId], references: [id])
+  
+  @@index([clientId, type])
+  @@index([status])
+}
+
+// Transaction Models
+model Transaction {
+  id                String    @id @default(cuid())
+  reference         String    @unique
+  type              String    // REMITTANCE, EXCHANGE, DEPOSIT, WITHDRAWAL
+  status            String    @default("PENDING") // PENDING, COMPLETED, FAILED, CANCELLED
+  amount            Float
+  fee               Float
+  exchangeRate      Float?
+  sendCurrency      String
+  receiveCurrency   String
+  sendAmount        Float
+  receiveAmount     Float
+  senderId          String
+  receiverId        String?
+  operatorId        String
+  branchId          String
+  createdAt         DateTime  @default(now())
+  completedAt       DateTime?
+  notes             String?
+  payoutMethod      String    // CASH, BANK_ACCOUNT, MOBILE_MONEY, etc.
+  payoutDetails     Json?
+  receiptUrl        String?
+  sender            Client    @relation("SenderTransactions", fields: [senderId], references: [id])
+  receiver          Client?   @relation("ReceiverTransactions", fields: [receiverId], references: [id])
+  operator          User      @relation(fields: [operatorId], references: [id])
+  branch            Branch    @relation(fields: [branchId], references: [id])
+  
+  @@index([reference])
+  @@index([type, status])
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([createdAt])
+  @@index([operatorId])
+}
+
+// Financial Models
+model CurrencyRate {
+  id              String    @id @default(cuid())
+  fromCurrency    String
+  toCurrency      String
+  rate            Float
+  buyRate         Float?
+  sellRate        Float?
+  effectiveDate   DateTime  @default(now())
+  expiryDate      DateTime?
+  updatedBy       String?
+  updatedAt       DateTime  @updatedAt
+  isActive        Boolean   @default(true)
+  
+  @@unique([fromCurrency, toCurrency])
+  @@index([fromCurrency, toCurrency])
+  @@index([isActive])
+}
+
+model ClientAccount {
+  id              String    @id @default(cuid())
+  clientId        String
+  accountNumber   String    @unique
+  currency        String
+  balance         Float     @default(0)
+  status          String    @default("ACTIVE")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  lastTransaction DateTime?
+  client          Client    @relation(fields: [clientId], references: [id])
+  transactions    AccountTransaction[]
+  
+  @@index([clientId])
+  @@index([accountNumber])
+  @@index([currency])
+  @@index([status])
+}
+
+model AccountTransaction {
+  id                String    @id @default(cuid())
+  accountId         String
+  type              String    // DEPOSIT, WITHDRAWAL, TRANSFER, FEE, etc.
+  amount            Float
+  balanceBefore     Float
+  balanceAfter      Float
+  currency          String
+  description       String?
+  reference         String?
+  status            String    @default("COMPLETED")
+  createdAt         DateTime  @default(now())
+  completedAt       DateTime?
+  account           ClientAccount @relation(fields: [accountId], references: [id])
+  
+  @@index([accountId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([reference])
+}
+
+model CashRegister {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  branchId        String
+  openedAt        DateTime  @default(now())
+  closedAt        DateTime?
+  status          String    @default("OPEN") // OPEN, CLOSED
+  initialBalance  Json      // Map of currency to amount
+  currentBalance  Json      // Map of currency to amount
+  user            User      @relation(fields: [userId], references: [id])
+  branch          Branch    @relation(fields: [branchId], references: [id])
+  cashMovements   CashMovement[]
+  
+  @@index([userId])
+  @@index([branchId])
+  @@index([status])
+}
+
+model CashMovement {
+  id              String    @id @default(cuid())
+  registerId      String
+  type            String    // DEPOSIT, WITHDRAWAL, ADJUSTMENT, etc.
+  amount          Float
+  currency        String
+  reference       String?
+  description     String?
+  createdAt       DateTime  @default(now())
+  createdBy       String
+  register        CashRegister @relation(fields: [registerId], references: [id])
+  
+  @@index([registerId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// Organization Models
+model Branch {
+  id              String    @id @default(cuid())
+  name            String
+  code            String    @unique
+  address         String?
+  city            String?
+  country         String
+  phoneNumber     String?
+  email           String?
+  status          String    @default("ACTIVE")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  agentId         String
+  agent           Agent     @relation(fields: [agentId], references: [id])
+  users           User[]
+  transactions    Transaction[]
+  cashRegisters   CashRegister[]
+  
+  @@index([code])
+  @@index([agentId])
+  @@index([status])
+}
+
+model Agent {
+  id              String    @id @default(cuid())
+  name            String
+  code            String    @unique
+  address         String?
+  city            String?
+  country         String
+  phoneNumber     String?
+  email           String?
+  status          String    @default("ACTIVE")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  branches        Branch[]
+  users           User[]
+  
+  @@index([code])
+  @@index([status])
+}
+
+// Compliance Models
+model ComplianceCheck {
+  id              String    @id @default(cuid())
+  clientId        String?
+  transactionId   String?
+  type            String    // KYC, AML, SANCTIONS, etc.
+  status          String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  notes           String?
+  checkedBy       String?
+  checkedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  
+  @@index([clientId])
+  @@index([transactionId])
+  @@index([type, status])
+  @@index([createdAt])
+}
+
+// Audit and Logging
+model AuditLog {
+  id              String    @id @default(cuid())
+  userId          String
+  action          String
+  entityType      String
+  entityId        String?
+  details         Json?
+  ipAddress       String?
+  userAgent       String?
+  createdAt       DateTime  @default(now())
+  
+  @@index([userId])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}

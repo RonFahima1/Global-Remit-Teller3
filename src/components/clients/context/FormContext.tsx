@@ -26,7 +26,7 @@ export function useFormContext() {
   return context;
 }
 
-export function FormProvider({ children }: { children: React.ReactNode }) {
+export function FormProvider({ children, initialData }: { children: React.ReactNode; initialData?: NewClientFormData }) {
   const [state, setState] = useState<FormState>({
     isSubmitting: false,
     errors: {},
@@ -86,7 +86,7 @@ export function FormProvider({ children }: { children: React.ReactNode }) {
 
   const form = useForm<NewClientFormData>({
     resolver: zodResolver(clientSchema),
-    defaultValues: defaultValues as NewClientFormData,
+    defaultValues: initialData || defaultValues as NewClientFormData,
     mode: 'onChange'
   });
 

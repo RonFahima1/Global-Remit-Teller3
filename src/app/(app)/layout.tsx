@@ -16,24 +16,43 @@ export default function AppAreaLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const showLoading = useLoadingTransition(loading);
 
+  // Always in development inspection mode for now
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login');
+    // Set development inspection mode to true by default
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dev_inspection_mode', 'true');
     }
-  }, [user, loading, router]);
+  }, []);
 
   if (showLoading) {
     return <LoadingState fullScreen message="Loading..." />;
   }
+  
+  // Always consider dev inspection mode as true
+  const devInspectionMode = true;
 
-  if (!user) {
-    return null; // Will redirect to login
-  }
-
+  // Add a dev mode indicator if in dev inspection mode
   return (
     <CustomSidebarProvider>
       <SearchProvider>
         <AppLayout>{children}</AppLayout>
+        {devInspectionMode && (
+          <div 
+            style={{
+              position: 'fixed',
+              bottom: '10px',
+              right: '10px',
+              background: 'rgba(255, 0, 0, 0.7)',
+              color: 'white',
+              padding: '5px 10px',
+              borderRadius: '4px',
+              fontSize: '12px',
+              zIndex: 9999
+            }}
+          >
+            DEV INSPECTION MODE (Ctrl+Shift+D to toggle)
+          </div>
+        )}
       </SearchProvider>
     </CustomSidebarProvider>
   );

@@ -1,130 +1,256 @@
-import React from 'react';
+'use client';
+
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Search, UserPlus, CheckCircle, Building } from 'lucide-react';
+import { Search, UserPlus, CheckCircle, Phone, Mail, MapPin, Loader2, ArrowLeft } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Client } from '../hooks/useSendMoneyForm';
+import { Card, CardContent } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useTransfer } from '@/context/transfer-context';
+import { Receiver } from '@/context/transfer-context';
+import { getReceivers } from '@/services/transfer-service';
+import { handleApiError } from '@/utils/api-error-handler';
 
-interface ReceiverSelectionProps {
-  initialLoading: boolean;
-  searchQuery: string;
-  setSearchQuery: (query: string) => void;
-  filteredClients: Client[];
-  selectedReceiver: Client | null;
-  setSelectedReceiver: (client: Client | null) => void;
-  setShowNewReceiverForm: (show: boolean) => void;
-}
-
-export const ReceiverSelection: React.FC<ReceiverSelectionProps> = ({
-  initialLoading,
-  searchQuery,
-  setSearchQuery,
-  filteredClients,
-  selectedReceiver,
-  setSelectedReceiver,
-  setShowNewReceiverForm
-}) => {
+export const ReceiverSelection: React.FC = () => {
+  const { state, dispatch } = useTransfer();
+  const { toast } = useToast();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [receivers, setReceivers] = useState<Receiver[]>([]);
+  const [filteredReceivers, setFilteredReceivers] = useState<Receiver[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  
+  // Handle search query debounce
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+  
+  // Load receivers for the selected sender
+  useEffect(() => {
+    if (!state.sender?.id) return;
+    
+    const loadReceivers = async () => {
+      setLoading(true);
+      try {
+        const data = await getReceivers(state.sender!.id);
+        setReceivers(data);
+        // Initially filter based on current search query if any
+        if (debouncedQuery.length >= 2) {
+          filterReceivers(data, debouncedQuery);
+        } else {
+          setFilteredReceivers(data);
+        }
+      } catch (error) {
+        handleApiError(error, 'Failed to load receivers');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadReceivers();
+  }, [state.sender?.id]);
+  
+  // Filter receivers when debounced query changes
+  useEffect(() => {
+    if (receivers.length > 0) {
+      filterReceivers(receivers, debouncedQuery);
+    }
+  }, [debouncedQuery, receivers]);
+  
+  // Filter receivers based on search query
+  const filterReceivers = (data: Receiver[], query: string) => {
+    if (query.length < 2) {
+      setFilteredReceivers(data);
+      return;
+    }
+    
+    const lowerQuery = query.toLowerCase();
+    const filtered = data.filter(receiver => 
+      receiver.name.toLowerCase().includes(lowerQuery) ||
+      receiver.phone.toLowerCase().includes(lowerQuery) ||
+      receiver.id.toLowerCase().includes(lowerQuery) ||
+      (receiver.email && receiver.email.toLowerCase().includes(lowerQuery))
+    );
+    
+    setFilteredReceivers(filtered);
+  };
+  
+  const handleSelectReceiver = (receiver: Receiver) => {
+    dispatch({ type: 'SET_RECEIVER', payload: receiver });
+    dispatch({ type: 'SET_STEP', payload: 3 });
+    
+    toast({
+      title: 'Receiver Selected',
+      description: `${receiver.name} has been selected as the receiver.`,
+    });
+  };
+  
+  const handleNewReceiver = () => {
+    // Navigate to create new receiver form
+    toast({
+      title: 'Add New Receiver',
+      description: 'Redirecting to new receiver form...',
+    });
+    // In a real implementation, we would navigate to a new receiver form
+    // or open a modal to create a new receiver
+  };
+  
+  const handleBack = () => {
+    dispatch({ type: 'SET_STEP', payload: 1 });
+  };
   return (
     <div className="max-w-4xl mx-auto">
+      {/* Back button and title */}
+      <div className="flex items-center mb-6">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={handleBack}
+          className="mr-2 rounded-full h-9 w-9"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <h2 className="text-xl font-medium">Select Receiver</h2>
+      </div>
+      
+      {/* Selected sender info */}
+      {state.sender && (
+        <Card className="mb-6 bg-muted/30 card-ios">
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground mb-1">Sending money from:</p>
+            <div className="flex items-center">
+              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center mr-3">
+                <span className="text-primary font-medium">{state.sender.name.charAt(0)}</span>
+              </div>
+              <div>
+                <p className="font-medium">{state.sender.name}</p>
+                <p className="text-sm text-muted-foreground">{state.sender.phone}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      
       {/* Search bar */}
-      <div className="relative mb-8">
+      <div className="relative mb-6">
         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-          <Search className="h-5 w-5 text-gray-400" />
+          <Search className="h-5 w-5 text-muted-foreground" />
         </div>
         <Input
           type="text"
           placeholder="Search by name, phone or ID..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-12 h-14 text-base rounded-xl border-gray-200 dark:border-gray-700 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          className="pl-12 h-12 text-base rounded-[14px] border-border/50 shadow-sm focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-0"
         />
       </div>
       
       {/* Loading state */}
-      {initialLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(6)].map((_, index) => (
-            <div key={index} className="animate-pulse bg-gray-100 dark:bg-gray-800 rounded-xl h-32"></div>
+            <div key={index} className="animate-pulse bg-muted rounded-[14px] h-32"></div>
           ))}
         </div>
-      ) : filteredClients.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
-          <div className="mb-4 inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700">
-            <Search className="h-8 w-8 text-gray-400" />
-          </div>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No receivers found</h3>
-          <p className="text-gray-500 dark:text-gray-400 mb-6">Try a different search or add a new receiver</p>
-          <Button
-            onClick={() => setShowNewReceiverForm(true)}
-            className="inline-flex items-center px-6 py-3 rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors"
-          >
-            <UserPlus className="mr-2 h-5 w-5" />
-            Add New Receiver
-          </Button>
+      ) : filteredReceivers.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-muted-foreground mb-4">
+            {!state.sender
+              ? "Please select a sender first"
+              : searchQuery.length < 2 
+                ? "Enter at least 2 characters to search" 
+                : "No receivers found matching your search criteria"}
+          </p>
+          {state.sender && (
+            <Button 
+              onClick={handleNewReceiver}
+              className="bg-primary hover:bg-primary/90 text-white"
+            >
+              <UserPlus className="mr-2 h-5 w-5" />
+              Add New Receiver
+            </Button>
+          )}
         </div>
       ) : (
-        <>
+        <div>
+          {/* Results count */}
+          <div className="mb-4">
+            <p className="text-sm text-muted-foreground">
+              {filteredReceivers.length} {filteredReceivers.length === 1 ? 'receiver' : 'receivers'} found
+            </p>
+          </div>
+          
+          {/* Results */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredClients.map((client, index) => (
+            {filteredReceivers.map((receiver) => (
               <motion.div
-                key={client.id}
-                initial={{ opacity: 0, y: 20 }}
+                key={receiver.id}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.05 }}
-                className="h-full"
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
               >
-                <div 
-                  onClick={() => setSelectedReceiver(client)}
+                <Card 
                   className={cn(
-                    "relative h-full p-4 rounded-xl border-2 cursor-pointer transition-all",
-                    selectedReceiver?.id === client.id 
-                      ? "border-green-500 bg-green-50 dark:bg-green-900/20 shadow-md" 
-                      : "border-gray-200 dark:border-gray-700 hover:border-green-300 dark:hover:border-green-700 bg-white dark:bg-gray-800"
+                    "card-ios overflow-hidden cursor-pointer transition-all duration-200",
+                    state.receiver?.id === receiver.id && "ring-2 ring-primary"
                   )}
+                  onClick={() => handleSelectReceiver(receiver)}
                 >
-                  {selectedReceiver?.id === client.id && (
-                    <div className="absolute top-3 right-3 text-green-500">
-                      <CheckCircle className="h-5 w-5" />
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-medium text-lg">{receiver.name}</h3>
+                        <p className="text-muted-foreground text-sm">ID: {receiver.id}</p>
+                      </div>
+                      {state.receiver?.id === receiver.id && (
+                        <CheckCircle className="h-5 w-5 text-success" />
+                      )}
                     </div>
-                  )}
-                  
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center text-green-600 dark:text-green-400 font-semibold text-lg shadow-sm">
-                      {client.name.charAt(0)}
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900 dark:text-white text-lg">{client.name}</h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">{client.phone}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-2 text-sm p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                    <div className="text-gray-500 dark:text-gray-400">Bank Account:</div>
-                    <div className="text-gray-900 dark:text-gray-200 font-medium">{client.bankAccount || '****1234'}</div>
                     
-                    <div className="text-gray-500 dark:text-gray-400">Country:</div>
-                    <div className="text-gray-900 dark:text-gray-200 font-medium">{client.country || 'USA'}</div>
-                    
-                    <div className="text-gray-500 dark:text-gray-400">Currency:</div>
-                    <div className="text-gray-900 dark:text-gray-200 font-medium">{client.currency || 'USD'}</div>
-                  </div>
-                </div>
+                    <div className="mt-4 space-y-2">
+                      <div className="flex items-center text-sm">
+                        <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
+                        <span>{receiver.phone}</span>
+                      </div>
+                      
+                      {receiver.email && (
+                        <div className="flex items-center text-sm">
+                          <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
+                          <span className="truncate">{receiver.email}</span>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center text-sm">
+                        <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
+                        <span>{receiver.country}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </motion.div>
             ))}
           </div>
           
-          <div className="flex justify-center mt-8">
-            <Button
-              onClick={() => setShowNewReceiverForm(true)}
+          {/* Add new receiver button */}
+          <div className="mt-6 flex justify-center">
+            <Button 
+              onClick={handleNewReceiver}
               variant="outline"
-              className="inline-flex items-center px-6 py-2.5 rounded-lg border-2 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              className="border-dashed border-primary/50"
             >
               <UserPlus className="mr-2 h-5 w-5" />
               Add New Receiver
             </Button>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

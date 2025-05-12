@@ -43,6 +43,9 @@ function KYCPage() {
     <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">KYC Management</h1>
+        <Button onClick={() => window.location.href = '/kyc/client-verification'} className="bg-primary hover:bg-primary/90">
+          Start Client Verification
+        </Button>
       </div>
 
       <Tabs defaultValue="pending" className="space-y-4">

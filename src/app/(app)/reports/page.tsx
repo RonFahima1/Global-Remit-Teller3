@@ -1,201 +1,481 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { format } from "date-fns";
-import { Calendar } from "@/components/ui/calendar";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
-import { CalendarIcon, Download, Loader2 } from "lucide-react";
-import { useTranslation } from "@/hooks/useTranslation";
-import {
-  generateReport,
-  exportReport,
-  downloadReport,
-  type ReportFilter,
-  type ReportData,
-} from "@/services/reports";
-import { BarChart, PieChart } from "@/components/ui/chart";
-import { Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-
-type ChartData = {
-  name: string;
-  value: number;
-};
-
-const mockReports = [
-  { id: 1, date: '2024-03-15', type: 'remittance', client: 'Jane Smith', amount: 500, status: 'completed' },
-  { id: 2, date: '2024-03-14', type: 'exchange', client: 'Alex Morgan', amount: 200, status: 'pending' },
-  { id: 3, date: '2024-03-14', type: 'remittance', client: 'Jane Smith', amount: 300, status: 'completed' },
-];
-
-function exportToCSV(data: any[], filename: string) {
-  const csv = [
-    Object.keys(data[0]).join(","),
-    ...data.map(row => Object.values(row).join(","))
-  ].join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { subDays } from 'date-fns';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { ReportFilters } from './components/ReportFilters';
+import { KpiCards } from './components/KpiCards';
+import { TransactionVolumeChart } from './components/TransactionVolumeChart';
+import { TransactionDistributionChart } from './components/TransactionDistributionChart';
+import { TransactionTable, Transaction } from './components/TransactionTable';
+import { ReportsDashboard } from './components/ReportsDashboard';
+import { ClientAnalytics } from './components/ClientAnalytics';
+import { ComplianceReportingMain } from './components/ComplianceReportingMain';
+import { Download } from 'lucide-react';
+import { 
+  generateMockTransactions,
+  calculateKpiData,
+  generateVolumeChartData,
+  generateDistributionChartData,
+  filterTransactions,
+  exportTransactionsToCSV,
+  downloadCSV
+} from '@/utils/mock-report-data';
+import { generateTransactionPDF, downloadPDF } from '@/utils/pdf-export';
+import { useToast } from '@/hooks/use-toast';
 
 export default function ReportsPage() {
-  const [loading, setLoading] = useState(false);
-  const [reportData, setReportData] = useState<ReportData | null>(null);
-  const { t } = useTranslation();
-  const { register, handleSubmit, watch } = useForm<ReportFilter>();
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [type, setType] = useState('all');
-  const [client, setClient] = useState('');
-
-  const onSubmit = async (data: ReportFilter) => {
-    setLoading(true);
-    try {
-      const report = await generateReport(data);
-      setReportData(report);
-    } catch (error) {
-      console.error("Failed to generate report:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleExport = async (format: "csv" | "pdf") => {
-    if (!reportData) return;
-
-    try {
-      const blob = await exportReport(reportData, format);
-      const filename = `report-${format(new Date(), "yyyy-MM-dd")}.${format}`;
-      downloadReport(blob, filename);
-    } catch (error) {
-      console.error("Failed to export report:", error);
-    }
-  };
-
-  const filtered = mockReports.filter(r => {
-    if (dateFrom && r.date < dateFrom) return false;
-    if (dateTo && r.date > dateTo) return false;
-    if (type !== 'all' && r.type !== type) return false;
-    if (client && !r.client.toLowerCase().includes(client.toLowerCase())) return false;
-    return true;
+  const searchParams = useSearchParams();
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState(() => {
+    // Get tab from URL query parameter if available
+    const tabParam = searchParams.get('tab');
+    return tabParam || 'dashboard';
   });
-
-  // Group by date for chart
-  const chartData = Object.values(
-    filtered.reduce((acc, r) => {
-      acc[r.date] = acc[r.date] || { date: r.date, volume: 0 };
-      acc[r.date].volume += r.amount;
-      return acc;
-    }, {} as Record<string, { date: string; volume: number }>)
-  ).sort((a, b) => a.date.localeCompare(b.date));
-
+  
+  const [period, setPeriod] = useState<'week' | 'month' | 'quarter' | 'year'>('month');
+  const [isLoading, setIsLoading] = useState(true);
+  const [showTransactionDetails, setShowTransactionDetails] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  
+  // Generate mock data
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
+  const [previousPeriodTransactions, setPreviousPeriodTransactions] = useState<Transaction[]>([]);
+  
+  // Filters state
+  const [filters, setFilters] = useState({
+    dateFrom: subDays(new Date(), 30),
+    dateTo: new Date(),
+    type: 'all',
+    clientId: '',
+    clientName: '',
+    status: 'all',
+    currency: 'all',
+    minAmount: '',
+    maxAmount: '',
+    tellerName: '',
+  });
+  
+  // Filtered transactions
+  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
+  
+  // Load mock data on component mount
+  useEffect(() => {
+    // Generate transactions for current period (last 30 days)
+    const currentTransactions = generateMockTransactions(30);
+    setAllTransactions(currentTransactions);
+    
+    // Generate transactions for previous period (30-60 days ago)
+    const previousTransactions = generateMockTransactions(30);
+    setPreviousPeriodTransactions(previousTransactions);
+    
+    // Apply initial filters
+    setFilteredTransactions(filterTransactions(currentTransactions, filters));
+    
+    setIsLoading(false);
+  }, []);
+  
+  // Apply filters to transactions
+  const handleApplyFilters = () => {
+    setIsLoading(true);
+    
+    // Simulate API delay
+    setTimeout(() => {
+      const filtered = filterTransactions(allTransactions, filters);
+      setFilteredTransactions(filtered);
+      setIsLoading(false);
+      
+      toast({
+        title: 'Filters Applied',
+        description: `Found ${filtered.length} transactions matching your criteria.`,
+      });
+    }, 500);
+  };
+  
+  // Reset filters to default values
+  const handleResetFilters = () => {
+    setFilters({
+      dateFrom: subDays(new Date(), 30),
+      dateTo: new Date(),
+      type: 'all',
+      clientId: '',
+      clientName: '',
+      status: 'all',
+      currency: 'all',
+      minAmount: '',
+      maxAmount: '',
+      tellerName: '',
+    });
+    
+    // Apply reset filters
+    handleApplyFilters();
+  };
+  
+  // Handle transaction export
+  const exportTransactionReport = async (format: 'csv' | 'pdf') => {
+    if (format === 'csv') {
+      const csvContent = exportTransactionsToCSV(filteredTransactions);
+      downloadCSV(csvContent, `transaction-report-${new Date().toISOString().split('T')[0]}.csv`);
+      
+      toast({
+        title: 'Export Complete',
+        description: 'Transaction report has been downloaded as CSV.',
+      });
+    } else {
+      // Generate PDF report
+      setIsLoading(true);
+      try {
+        const pdfBlob = await generateTransactionPDF(
+          filteredTransactions,
+          'Transaction Report',
+          { ...filters }
+        );
+        
+        downloadPDF(pdfBlob, `transaction-report-${new Date().toISOString().split('T')[0]}.pdf`);
+        
+        toast({
+          title: 'Export Complete',
+          description: 'Transaction report has been downloaded as PDF.',
+        });
+      } catch (error) {
+        console.error('PDF generation error:', error);
+        toast({
+          title: 'Export Failed',
+          description: 'There was an error generating the PDF report.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+  
+  // Export compliance report
+  const exportComplianceReport = async (format: 'csv' | 'pdf') => {
+    toast({
+      title: 'Export Initiated',
+      description: `Compliance report will be downloaded as ${format.toUpperCase()}.`,
+    });
+    
+    // Implementation would be similar to exportTransactionReport
+    // but with compliance data
+  };
+  
+  // Handle viewing transaction details
+  const handleViewTransactionDetails = (transactionId: string) => {
+    const transaction = filteredTransactions.find(tx => tx.id === transactionId);
+    if (transaction) {
+      setSelectedTransaction(transaction);
+      setShowTransactionDetails(true);
+    }
+  };
+  
+  // Handle creating custom report
+  const handleCreateCustomReport = () => {
+    toast({
+      title: 'Feature Coming Soon',
+      description: 'Custom report builder will be available in a future update.',
+    });
+  };
+  
+  // Handle viewing custom report
+  const handleViewCustomReport = (reportId: string) => {
+    toast({
+      title: 'Report Viewer',
+      description: `Viewing ${reportId} report. This feature is under development.`,
+    });
+  };
+  
+  // Calculate KPI data
+  const kpis = calculateKpiData(filteredTransactions, previousPeriodTransactions);
+  
+  // Generate chart data
+  const chartData = generateVolumeChartData(filteredTransactions);
+  const distributionData = generateDistributionChartData(filteredTransactions);
+  
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-4">Reports</h1>
-      <div className="flex flex-wrap gap-4 items-end mb-6">
-        <div>
-          <label className="block text-xs font-medium mb-1">Date From</label>
-          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="border rounded px-2 py-1 text-sm" />
-        </div>
-        <div>
-          <label className="block text-xs font-medium mb-1">Date To</label>
-          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="border rounded px-2 py-1 text-sm" />
-        </div>
-        <div>
-          <label className="block text-xs font-medium mb-1">Type</label>
-          <select value={type} onChange={e => setType(e.target.value)} className="border rounded px-2 py-1 text-sm">
-            <option value="all">All</option>
-            <option value="remittance">Remittance</option>
-            <option value="exchange">Exchange</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-medium mb-1">Client</label>
-          <input type="text" value={client} onChange={e => setClient(e.target.value)} placeholder="Client name" className="border rounded px-2 py-1 text-sm" />
-        </div>
-        <button
-          className="px-4 py-2 bg-blue-600 text-white rounded"
-          onClick={() => filtered.length && exportToCSV(filtered, 'report.csv')}
-        >
-          Export CSV
-        </button>
-        <button className="px-4 py-2 bg-gray-200 text-gray-800 rounded">Export PDF</button>
+    <div className="p-4 md:p-6 space-y-6">
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-semibold text-foreground">Reports & Analytics</h1>
       </div>
-      <div className="mb-8">
-        <div className="bg-white rounded-lg border p-4 mb-4">
-          <div className="font-semibold mb-2">Summary</div>
-          <div className="flex gap-8">
-            <div>Total Volume: <b>${filtered.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}</b></div>
-            <div>Transactions: <b>{filtered.length}</b></div>
+      
+      {/* Main Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid grid-cols-6 w-full md:w-auto">
+          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+          <TabsTrigger value="transactions">Transactions</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="clients">Clients</TabsTrigger>
+          <TabsTrigger value="compliance">Compliance</TabsTrigger>
+          <TabsTrigger value="custom">Custom</TabsTrigger>
+        </TabsList>
+        
+        {/* Dashboard Tab */}
+        <TabsContent value="dashboard" className="space-y-6">
+          <ReportsDashboard 
+            period={period} 
+            onPeriodChange={setPeriod} 
+          />
+        </TabsContent>
+        
+        {/* Transactions Tab */}
+        <TabsContent value="transactions" className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <h2 className="text-xl font-semibold">Transaction Reports</h2>
+            
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant={period === 'week' ? 'default' : 'outline'} 
+                  size="sm"
+                  onClick={() => setPeriod('week')}
+                >
+                  Week
+                </Button>
+                <Button 
+                  variant={period === 'month' ? 'default' : 'outline'} 
+                  size="sm"
+                  onClick={() => setPeriod('month')}
+                >
+                  Month
+                </Button>
+                <Button 
+                  variant={period === 'quarter' ? 'default' : 'outline'} 
+                  size="sm"
+                  onClick={() => setPeriod('quarter')}
+                >
+                  Quarter
+                </Button>
+                <Button 
+                  variant={period === 'year' ? 'default' : 'outline'} 
+                  size="sm"
+                  onClick={() => setPeriod('year')}
+                >
+                  Year
+                </Button>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => exportTransactionReport('csv')}
+                  className="flex items-center gap-1.5"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  CSV
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => exportTransactionReport('pdf')}
+                  className="flex items-center gap-1.5"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  PDF
+                </Button>
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="bg-white rounded-lg border p-4">
-          <div className="font-semibold mb-2">Transaction Volume (Bar Chart)</div>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 16, right: 16, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="volume" fill="#2563eb" />
-              </BarChart>
-            </ResponsiveContainer>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <TransactionVolumeChart data={chartData} />
+            <TransactionDistributionChart data={distributionData} />
           </div>
-        </div>
-      </div>
-      <div className="bg-white rounded-lg border p-4">
-        <div className="font-semibold mb-2">Report Table</div>
-        <table className="w-full text-sm">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="p-2">Date</th>
-              <th className="p-2">Type</th>
-              <th className="p-2">Client</th>
-              <th className="p-2">Amount</th>
-              <th className="p-2">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(r => (
-              <tr key={r.id} className="border-t">
-                <td className="p-2">{r.date}</td>
-                <td className="p-2 capitalize">{r.type}</td>
-                <td className="p-2">{r.client}</td>
-                <td className="p-2">{r.amount.toLocaleString()}</td>
-                <td className="p-2 capitalize">{r.status}</td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr><td colSpan={5} className="text-center text-gray-400 py-4">No data found.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+          
+          <TransactionTable 
+            transactions={filteredTransactions} 
+            onViewDetails={handleViewTransactionDetails} 
+          />
+        </TabsContent>
+        
+        {/* Analytics Tab */}
+        <TabsContent value="analytics" className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <h2 className="text-xl font-semibold">Analytics Dashboard</h2>
+            
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant={period === 'week' ? 'default' : 'outline'} 
+                  size="sm"
+                  onClick={() => setPeriod('week')}
+                >
+                  Week
+                </Button>
+                <Button 
+                  variant={period === 'month' ? 'default' : 'outline'} 
+                  size="sm"
+                  onClick={() => setPeriod('month')}
+                >
+                  Month
+                </Button>
+                <Button 
+                  variant={period === 'quarter' ? 'default' : 'outline'} 
+                  size="sm"
+                  onClick={() => setPeriod('quarter')}
+                >
+                  Quarter
+                </Button>
+                <Button 
+                  variant={period === 'year' ? 'default' : 'outline'} 
+                  size="sm"
+                  onClick={() => setPeriod('year')}
+                >
+                  Year
+                </Button>
+              </div>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <KpiCards kpis={kpis} />
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <TransactionVolumeChart data={chartData} />
+            <TransactionDistributionChart data={distributionData} />
+          </div>
+        </TabsContent>
+
+        {/* Clients Tab */}
+        <TabsContent value="clients" className="space-y-6">
+          <ClientAnalytics 
+            period={period} 
+            onPeriodChange={setPeriod} 
+          />
+        </TabsContent>
+
+        {/* Compliance Tab */}
+        <TabsContent value="compliance" className="space-y-6">
+          <ComplianceReportingMain 
+            period={period} 
+            onPeriodChange={setPeriod} 
+            onExport={exportComplianceReport}
+          />
+        </TabsContent>
+        
+        {/* Custom Reports Tab */}
+        <TabsContent value="custom" className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <h2 className="text-xl font-semibold">Custom Reports</h2>
+            
+            <Button onClick={handleCreateCustomReport}>
+              Create New Report
+            </Button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="card-ios">
+              <CardHeader>
+                <CardTitle>Monthly Transaction Summary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Summary of all transactions with volume and fee analysis
+                </p>
+                <div className="flex justify-end">
+                  <Button variant="outline" size="sm" onClick={() => handleViewCustomReport('monthly-transactions')}>
+                    View Report
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="card-ios">
+              <CardHeader>
+                <CardTitle>Client Acquisition Report</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Analysis of new client registrations and conversion rates
+                </p>
+                <div className="flex justify-end">
+                  <Button variant="outline" size="sm" onClick={() => handleViewCustomReport('client-acquisition')}>
+                    View Report
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="card-ios">
+              <CardHeader>
+                <CardTitle>Regulatory Compliance Audit</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Comprehensive audit report for regulatory compliance
+                </p>
+                <div className="flex justify-end">
+                  <Button variant="outline" size="sm" onClick={() => handleViewCustomReport('compliance-audit')}>
+                    View Report
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
+      
+      {/* Transaction Details Dialog */}
+      <Dialog open={showTransactionDetails} onOpenChange={setShowTransactionDetails}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Transaction Details</DialogTitle>
+          </DialogHeader>
+          
+          {selectedTransaction && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Transaction ID</p>
+                  <p className="font-medium">{selectedTransaction.id}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Date</p>
+                  <p className="font-medium">{new Date(selectedTransaction.date).toLocaleString()}</p>
+                </div>
+              </div>
+              
+              <div>
+                <p className="text-sm text-muted-foreground">Type</p>
+                <p className="font-medium capitalize">{selectedTransaction.type}</p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Client</p>
+                  <p className="font-medium">{selectedTransaction.clientName}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Client ID</p>
+                  <p className="font-medium">{selectedTransaction.clientId}</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Amount</p>
+                  <p className="font-medium">{selectedTransaction.amount.toLocaleString()} {selectedTransaction.currency}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  <p className="font-medium capitalize">{selectedTransaction.status}</p>
+                </div>
+              </div>
+              
+              <div>
+                <p className="text-sm text-muted-foreground">Processed By</p>
+                <p className="font-medium">{selectedTransaction.tellerName}</p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
-} 
+}

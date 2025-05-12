@@ -33,6 +33,7 @@ const SIDEBAR_COLLAPSED = 80;
 const mainNav: NavItem[] = [
   { title: "Home", href: "/dashboard", icon: Home },
   { title: "Send Money", href: "/send-money", icon: Send },
+  { title: "Transfer History", href: "/transfer-history", icon: History },
   { title: "Currency Exchange", href: "/exchange", icon: ArrowLeftRight },
   { title: "Client Balance", href: "/client-balance", icon: Wallet },
   { title: "Cash Register", href: "/cash-register", icon: Calculator },

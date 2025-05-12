@@ -1,194 +1,392 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { ArrowLeft, ArrowRight, CreditCard, Wallet, Building, Info } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FormData } from '../hooks/useSendMoneyForm';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { ErrorFallback } from './ErrorFallback';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useTransfer } from '@/context/transfer-context';
+import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
-interface TransferDetailsProps {
-  formData: FormData;
-  handleSelectChange: (name: string, value: string) => void;
-  errors: Record<string, string>;
-}
-
-export const TransferDetails: React.FC<TransferDetailsProps> = ({
-  formData,
-  handleSelectChange,
-  errors
-}) => {
+export const TransferDetails: React.FC = () => {
+  const { state, dispatch } = useTransfer();
+  const { toast } = useToast();
+  const [payoutType, setPayoutType] = useState<string>('CASH');
+  const [showBankDetails, setShowBankDetails] = useState(false);
+  const [showMobileWalletDetails, setShowMobileWalletDetails] = useState(false);
+  const [purpose, setPurpose] = useState<string>(state.purpose || '');
+  const [reference, setReference] = useState<string>(state.reference || '');
+  const [sourceOfFunds, setSourceOfFunds] = useState<string>('SALARY');
+  const [bankName, setBankName] = useState<string>('');
+  const [accountNumber, setAccountNumber] = useState<string>('');
+  const [branchCode, setBranchCode] = useState<string>('');
+  const [walletProvider, setWalletProvider] = useState<string>('');
+  const [mobileNumber, setMobileNumber] = useState<string>('');
+  const [notes, setNotes] = useState<string>('');
+  
   // Source of funds options
   const sourceOfFundsOptions = [
-    { value: 'salary', label: 'Salary' },
-    { value: 'savings', label: 'Savings' },
-    { value: 'business', label: 'Business Income' },
-    { value: 'investment', label: 'Investment Returns' },
-    { value: 'gift', label: 'Gift' },
-    { value: 'other', label: 'Other' }
+    { value: 'SALARY', label: 'Salary' },
+    { value: 'SAVINGS', label: 'Savings' },
+    { value: 'BUSINESS', label: 'Business Income' },
+    { value: 'INVESTMENT', label: 'Investment Returns' },
+    { value: 'GIFT', label: 'Gift' },
+    { value: 'OTHER', label: 'Other' }
   ];
   
   // Purpose of transfer options
   const purposeOfTransferOptions = [
-    { value: 'family_support', label: 'Family Support' },
-    { value: 'education', label: 'Education' },
-    { value: 'medical', label: 'Medical Expenses' },
-    { value: 'business', label: 'Business' },
-    { value: 'travel', label: 'Travel' },
-    { value: 'gift', label: 'Gift' },
-    { value: 'other', label: 'Other' }
+    { value: 'FAMILY_SUPPORT', label: 'Family Support' },
+    { value: 'EDUCATION', label: 'Education' },
+    { value: 'MEDICAL', label: 'Medical Expenses' },
+    { value: 'BUSINESS', label: 'Business' },
+    { value: 'TRAVEL', label: 'Travel' },
+    { value: 'GIFT', label: 'Gift' },
+    { value: 'OTHER', label: 'Other' }
   ];
   
-  // Transfer type options
-  const transferTypeOptions = [
-    { value: 'bank', label: 'Bank Transfer' },
-    { value: 'cash', label: 'Cash Pickup' },
-    { value: 'mobile', label: 'Mobile Wallet' }
+  // Payout method options with icons
+  const payoutMethodOptions = [
+    { value: 'CASH', label: 'Cash Pickup', icon: <Wallet className="h-5 w-5 mb-2" /> },
+    { value: 'BANK', label: 'Bank Transfer', icon: <Building className="h-5 w-5 mb-2" /> },
+    { value: 'MOBILE', label: 'Mobile Wallet', icon: <CreditCard className="h-5 w-5 mb-2" /> }
   ];
   
-  // Error handling
-  const [hasErrorComponents, setHasErrorComponents] = useState(true);
-  
-  // Ensure error components are loaded
-  useEffect(() => {
-    // This simulates checking if error components are available
-    setHasErrorComponents(true);
-  }, []);
-  
-  // Handle errors with a custom reset function
-  const handleErrorReset = () => {
-    window.location.reload();
+  const handlePayoutTypeChange = (value: string) => {
+    setPayoutType(value);
+    setShowBankDetails(value === 'BANK');
+    setShowMobileWalletDetails(value === 'MOBILE');
   };
   
-  if (!hasErrorComponents) {
-    return <div className="p-4 text-red-500">Loading error components...</div>;
-  }
+  const handlePurposeChange = (value: string) => {
+    setPurpose(value);
+    dispatch({ type: 'SET_PURPOSE', payload: value });
+  };
   
+  const handleReferenceChange = (value: string) => {
+    setReference(value);
+    dispatch({ type: 'SET_REFERENCE', payload: value });
+  };
+  
+  const handleSourceOfFundsChange = (value: string) => {
+    setSourceOfFunds(value);
+  };
+  
+  const handleNotesChange = (value: string) => {
+    setNotes(value);
+  };
+  
+  const handleBack = () => {
+    dispatch({ type: 'SET_STEP', payload: 3 });
+  };
+  
+  const handleNext = () => {
+    // Validate required fields
+    if (!purpose) {
+      toast({
+        title: 'Missing Information',
+        description: 'Please select a purpose for this transfer.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    // For bank transfers, validate bank details
+    if (payoutType === 'BANK' && (!bankName || !accountNumber)) {
+      toast({
+        title: 'Missing Bank Details',
+        description: 'Please complete all required bank details.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    // For mobile wallet, validate mobile details
+    if (payoutType === 'MOBILE' && (!walletProvider || !mobileNumber)) {
+      toast({
+        title: 'Missing Wallet Details',
+        description: 'Please complete all required mobile wallet details.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    dispatch({ type: 'SET_STEP', payload: 5 });
+  };
+
   return (
-    <ErrorBoundary
-      fallback={
-        <div className="max-w-3xl mx-auto py-8">
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 text-center">
-            <h3 className="text-lg font-medium text-red-800 dark:text-red-200 mb-2">Something went wrong</h3>
-            <p className="text-sm text-red-600 dark:text-red-300 mb-4">
-              There was an error loading the transfer details. Please try again.
-            </p>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
-            >
-              Reload Page
-            </button>
-          </div>
-        </div>
-      }
-    >
-      <div className="space-y-6">
-        <div className="max-w-3xl mx-auto space-y-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
+    <div className="max-w-3xl mx-auto space-y-6">
+      {/* Back button and title */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={handleBack}
+            className="mr-2 rounded-full h-9 w-9"
           >
-            <div className="p-6 md:p-8 lg:p-10 bg-white dark:bg-gray-800 rounded-xl shadow-lg">
-              <div className="space-y-6 md:grid md:grid-cols-2 md:gap-8 md:space-y-0">
-                {/* Source of Funds */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Source of Funds
-                  </label>
-                  <Select
-                    value={formData.sourceOfFunds}
-                    onValueChange={(value) => handleSelectChange('sourceOfFunds', value)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select source of funds" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {sourceOfFundsOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.sourceOfFunds && (
-                    <p className="text-sm text-red-500 mt-1">{errors.sourceOfFunds}</p>
-                  )}
-                </div>
-                
-                {/* Purpose of Transfer */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Purpose of Transfer
-                  </label>
-                  <Select
-                    value={formData.purposeOfTransfer}
-                    onValueChange={(value) => handleSelectChange('purposeOfTransfer', value)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select purpose of transfer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {purposeOfTransferOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.purposeOfTransfer && (
-                    <p className="text-sm text-red-500 mt-1">{errors.purposeOfTransfer}</p>
-                  )}
-                </div>
-                
-                {/* Transfer Type */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Transfer Type
-                  </label>
-                  <Select
-                    value={formData.transferType}
-                    onValueChange={(value) => handleSelectChange('transferType', value)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select transfer type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {transferTypeOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.transferType && (
-                    <p className="text-sm text-red-500 mt-1">{errors.transferType}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </motion.div>
-          
-          <motion.div
-            className="mt-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3, delay: 0.2 }}
-          >
-            <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-lg p-4 flex items-start">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-purple-500 dark:text-purple-400 mt-0.5 mr-3 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-              </svg>
-              <div className="text-sm text-purple-700 dark:text-purple-300">
-                <p className="font-medium mb-1">Important Information</p>
-                <p className="mb-2">Please ensure all information is accurate and complies with local regulations.</p>
-                <p>All transfer details are securely encrypted and comply with international regulations.</p>
-              </div>
-            </div>
-          </motion.div>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h2 className="text-xl font-medium">Transfer Details</h2>
         </div>
+        
+        <Button 
+          onClick={handleNext}
+          className="bg-primary hover:bg-primary/90 text-white rounded-full px-5"
+        >
+          <span>Next</span>
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
       </div>
-    </ErrorBoundary>
+      
+      {/* Transfer Summary */}
+      <Card className="card-ios overflow-hidden border-border/50">
+        <CardContent className="p-6">
+          <h3 className="text-lg font-medium mb-4">Transfer Summary</h3>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Sender</p>
+                <p className="font-medium">{state.sender?.name}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Receiver</p>
+                <p className="font-medium">{state.receiver?.name}</p>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Amount</p>
+                <p className="font-medium">{state.sourceCurrency} {state.amount.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Receiver Gets</p>
+                <p className="font-medium text-primary">{state.targetCurrency} {state.receiveAmount.toFixed(2)}</p>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Fee</p>
+                <p className="font-medium">{state.sourceCurrency} {state.fee.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total</p>
+                <p className="font-medium">{state.sourceCurrency} {state.totalAmount.toFixed(2)}</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Payout Method Selection */}
+      <Card className="card-ios overflow-hidden border-border/50">
+        <CardContent className="p-6">
+          <h3 className="text-lg font-medium mb-4">Payout Method</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {payoutMethodOptions.map((option) => (
+              <div
+                key={option.value}
+                onClick={() => handlePayoutTypeChange(option.value)}
+                className={cn(
+                  "p-4 border rounded-[14px] cursor-pointer transition-all text-center flex flex-col items-center",
+                  payoutType === option.value
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border/50 hover:border-primary/30 hover:bg-muted/30"
+                )}
+              >
+                {option.icon}
+                <p className="font-medium">{option.label}</p>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Conditional Fields Based on Payout Method */}
+      {showBankDetails && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        >
+          <Card className="card-ios overflow-hidden border-border/50">
+            <CardContent className="p-6 space-y-4">
+              <h3 className="text-lg font-medium mb-2">Bank Details</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium">
+                    Bank Name <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    value={bankName}
+                    onChange={(e) => setBankName(e.target.value)}
+                    placeholder="Enter bank name"
+                    className="rounded-[14px] border-border/50"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium">
+                    Account Number <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    value={accountNumber}
+                    onChange={(e) => setAccountNumber(e.target.value)}
+                    placeholder="Enter account number"
+                    className="rounded-[14px] border-border/50"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium">
+                    Branch Code
+                  </label>
+                  <Input
+                    value={branchCode}
+                    onChange={(e) => setBranchCode(e.target.value)}
+                    placeholder="Enter branch code (optional)"
+                    className="rounded-[14px] border-border/50"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      {showMobileWalletDetails && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        >
+          <Card className="card-ios overflow-hidden border-border/50">
+            <CardContent className="p-6 space-y-4">
+              <h3 className="text-lg font-medium mb-2">Mobile Wallet Details</h3>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium">
+                    Mobile Wallet Provider <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    value={walletProvider}
+                    onChange={(e) => setWalletProvider(e.target.value)}
+                    placeholder="Enter wallet provider"
+                    className="rounded-[14px] border-border/50"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium">
+                    Mobile Number <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    value={mobileNumber}
+                    onChange={(e) => setMobileNumber(e.target.value)}
+                    placeholder="Enter mobile number"
+                    className="rounded-[14px] border-border/50"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* Source of Funds and Purpose */}
+      <Card className="card-ios overflow-hidden border-border/50">
+        <CardContent className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Source of Funds */}
+            <div className="space-y-2">
+              <label className="flex items-center text-sm font-medium">
+                <span>Source of Funds</span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 ml-1">
+                        <Info className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Required for compliance purposes</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </label>
+              <Select
+                value={sourceOfFunds}
+                onValueChange={handleSourceOfFundsChange}
+              >
+                <SelectTrigger className="rounded-[14px] border-border/50">
+                  <SelectValue placeholder="Select source of funds" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sourceOfFundsOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Purpose of Transfer */}
+            <div className="space-y-2">
+              <label className="flex items-center text-sm font-medium">
+                <span>Purpose of Transfer</span> <span className="text-red-500 ml-1">*</span>
+              </label>
+              <Select
+                value={purpose}
+                onValueChange={handlePurposeChange}
+              >
+                <SelectTrigger className="rounded-[14px] border-border/50">
+                  <SelectValue placeholder="Select purpose" />
+                </SelectTrigger>
+                <SelectContent>
+                  {purposeOfTransferOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Reference */}
+          <div className="mt-6 space-y-2">
+            <label className="block text-sm font-medium">
+              Reference Number
+            </label>
+            <Input
+              value={reference}
+              onChange={(e) => handleReferenceChange(e.target.value)}
+              placeholder="Enter reference number (optional)"
+              className="rounded-[14px] border-border/50"
+            />
+          </div>
+
+          {/* Notes */}
+          <div className="mt-6 space-y-2">
+            <label className="block text-sm font-medium">
+              Additional Notes (Optional)
+            </label>
+            <Textarea
+              value={notes}
+              onChange={(e) => handleNotesChange(e.target.value)}
+              placeholder="Add any additional information here..."
+              className="rounded-[14px] border-border/50 min-h-[100px]"
+            />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 };

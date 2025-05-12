@@ -14,11 +14,12 @@ interface NewClientFormProps {
   onSubmit: (data: NewClientFormData) => Promise<void>;
   onCancel: () => void;
   isLoading: boolean;
+  initialData?: NewClientFormData;
 }
 
-export function NewClientForm({ onSubmit, onCancel, isLoading }: NewClientFormProps) {
+export function NewClientForm({ onSubmit, onCancel, isLoading, initialData }: NewClientFormProps) {
   return (
-    <FormProvider>
+    <FormProvider initialData={initialData}>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 sm:p-6 lg:p-8">
         <form onSubmit={(e) => {
           e.preventDefault();

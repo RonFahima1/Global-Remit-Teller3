@@ -1,176 +1,318 @@
-import React from 'react';
+'use client';
+
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { GlassmorphicCard } from '@/components/ui/GlassmorphicCard';
-import { FormData } from '../hooks/useSendMoneyForm';
+import { DollarSign, RefreshCw, ArrowLeft, ArrowRight, Info } from 'lucide-react';
+import { useTransfer } from '@/context/transfer-context';
+import { getExchangeRate, calculateFee } from '@/services/transfer-service';
+import { handleApiError } from '@/utils/api-error-handler';
+import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-interface AmountEntryProps {
-  formData: FormData;
-  handleInputChange: (name: string, value: string) => void;
-  errors: Record<string, string>;
-  calculateFee: (amount: number) => number;
-  calculateRecipientAmount: (amount: number) => number;
-  calculateTotalAmount: (amount: number) => number;
-  selectedReceiverCurrency?: string;
-}
-
-export const AmountEntry: React.FC<AmountEntryProps> = ({
-  formData,
-  handleInputChange,
-  errors,
-  calculateFee,
-  calculateRecipientAmount,
-  calculateTotalAmount,
-  selectedReceiverCurrency = 'EUR'
-}) => {
-  return (
-    <div className="space-y-6">
-      {/* Removed duplicate title since it's already in the page header */}
-
-      <GlassmorphicCard
-        variant="elevated"
-        colorScheme="blue"
-        className="p-6 max-w-3xl mx-auto md:p-8 lg:p-10"
-      >
-        <div className="space-y-6">
-          <div className="flex flex-col items-center">
-            <div className="relative w-full max-w-md">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <span className="text-gray-500 sm:text-lg">$</span>
-              </div>
-              <motion.input
-                type="text"
-                value={formData.amount}
-                onChange={(e) => {
-                  // Allow only numbers and decimals
-                  const value = e.target.value.replace(/[^0-9.]/g, '');
-                  handleInputChange('amount', value);
-                }}
-                placeholder="0.00"
-                className={cn(
-                  "block w-full pl-8 pr-12 py-3 text-3xl font-semibold text-center rounded-lg",
-                  "border-gray-300 focus:ring-blue-500 focus:border-blue-500",
-                  errors.amount ? "border-red-500" : ""
-                )}
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ duration: 0.3 }}
-              />
-              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                <span className="text-gray-500">{formData.currency}</span>
-              </div>
-            </div>
-            
-            {/* Suggested Amounts */}
-            <motion.div 
-              className="mt-6 space-y-3"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.2 }}
-            >
-              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 text-center">Suggested Amounts</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {[100, 200, 500, 1000].map((amount) => (
-                  <motion.button
-                    key={amount}
-                    type="button"
-                    onClick={() => handleInputChange('amount', amount.toString())}
-                    className={cn(
-                      "px-4 py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-center",
-                      formData.amount === amount.toString()
-                        ? "bg-blue-500 text-white shadow-md"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                    )}
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                  >
-                    <span className="text-lg">{formData.currency} {amount}</span>
-                  </motion.button>
-                ))}
-              </div>
-              <div className="flex justify-center mt-2">
-                <motion.button
-                  type="button"
-                  onClick={() => handleInputChange('amount', '')}
-                  className="px-6 py-2 rounded-full text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition-all"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  Custom Amount
-                </motion.button>
-              </div>
-            </motion.div>
-            
-            {errors.amount && (
-              <motion.p
-                className="mt-2 text-sm text-red-600"
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                {errors.amount}
-              </motion.p>
-            )}
-          </div>
-
-          <motion.div
-            className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.1 }}
-          >
-            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-4">Transfer Summary</h3>
-            
-            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 md:p-5 space-y-3">
-              <div className="flex justify-between items-center text-sm">
-                <div className="flex items-center">
-                  <div className="w-2 h-2 rounded-full bg-blue-400 mr-2"></div>
-                  <span className="text-gray-600 dark:text-gray-300">Fee:</span>
-                </div>
-                <span className="font-medium text-gray-900 dark:text-gray-100">{formData.currency}{calculateFee(parseFloat(formData.amount) || 0).toFixed(2)}</span>
-              </div>
-              
-              <div className="flex justify-between items-center text-sm">
-                <div className="flex items-center">
-                  <div className="w-2 h-2 rounded-full bg-green-400 mr-2"></div>
-                  <span className="text-gray-600 dark:text-gray-300">Exchange Rate:</span>
-                </div>
-                <span className="font-medium text-gray-900 dark:text-gray-100">1 {formData.currency} = {formData.exchangeRate} {selectedReceiverCurrency}</span>
-              </div>
-              
-              <div className="flex justify-between items-center text-sm">
-                <div className="flex items-center">
-                  <div className="w-2 h-2 rounded-full bg-purple-400 mr-2"></div>
-                  <span className="text-gray-600 dark:text-gray-300">Recipient Gets:</span>
-                </div>
-                <span className="font-medium text-gray-900 dark:text-gray-100">{selectedReceiverCurrency} {calculateRecipientAmount(parseFloat(formData.amount) || 0).toFixed(2)}</span>
-              </div>
-              
-              <div className="flex justify-between items-center pt-3 border-t border-gray-200 dark:border-gray-700 mt-2">
-                <span className="font-medium text-gray-900 dark:text-gray-100">Total Amount:</span>
-                <span className="font-bold text-lg text-gray-900 dark:text-white">{formData.currency} {calculateTotalAmount(parseFloat(formData.amount) || 0).toFixed(2)}</span>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </GlassmorphicCard>
+export const AmountEntry: React.FC = () => {
+  const { state, dispatch } = useTransfer();
+  const { toast } = useToast();
+  const [sendAmount, setSendAmount] = useState<string>(state.amount?.toString() || '');
+  const [exchangeRate, setExchangeRate] = useState<number>(state.exchangeRate || 1);
+  const [fee, setFee] = useState<number>(state.fee || 0);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [availableCurrencies, setAvailableCurrencies] = useState<string[]>(['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY']);
+  
+  // Initialize currencies if not set
+  useEffect(() => {
+    if (!state.sourceCurrency) {
+      dispatch({ type: 'SET_SOURCE_CURRENCY', payload: 'USD' });
+    }
+    
+    if (!state.targetCurrency) {
+      dispatch({ type: 'SET_TARGET_CURRENCY', payload: 'EUR' });
+    }
+  }, []);
+  
+  // Update transfer state when amount changes
+  useEffect(() => {
+    if (sendAmount && !isNaN(parseFloat(sendAmount))) {
+      const amount = parseFloat(sendAmount);
+      dispatch({ type: 'SET_AMOUNT', payload: amount });
       
-      <motion.div
-        className="max-w-3xl mx-auto mt-4"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3, delay: 0.2 }}
-      >
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg p-4 flex items-start">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500 dark:text-blue-400 mt-0.5 mr-3 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-          </svg>
-          <div className="text-sm text-blue-700 dark:text-blue-300">
-            <p className="font-medium mb-1">Exchange Rate Information</p>
-            <p>The exchange rate is updated in real-time based on current market conditions. The final rate will be locked in when you confirm the transfer.</p>
-          </div>
+      // Calculate receive amount
+      const receiveAmount = amount * exchangeRate;
+      dispatch({ type: 'SET_RECEIVE_AMOUNT', payload: receiveAmount });
+    }
+  }, [sendAmount, exchangeRate, dispatch]);
+  
+  // Calculate fee when amount changes
+  useEffect(() => {
+    const calculateTransferFee = async () => {
+      if (state.amount && state.amount > 0 && state.sourceCurrency && state.targetCurrency) {
+        try {
+          const calculatedFee = await calculateFee(
+            state.amount,
+            state.sourceCurrency,
+            state.targetCurrency
+          );
+          setFee(calculatedFee);
+          dispatch({ type: 'SET_FEE', payload: calculatedFee });
+        } catch (error) {
+          handleApiError(error, 'Failed to calculate fee');
+        }
+      }
+    };
+    
+    calculateTransferFee();
+  }, [state.amount, state.sourceCurrency, state.targetCurrency, dispatch]);
+  
+  // Fetch exchange rate when currencies change
+  useEffect(() => {
+    const fetchExchangeRate = async () => {
+      if (state.sourceCurrency && state.targetCurrency) {
+        setLoading(true);
+        try {
+          const rate = await getExchangeRate(
+            state.sourceCurrency,
+            state.targetCurrency
+          );
+          setExchangeRate(rate);
+          dispatch({ type: 'SET_EXCHANGE_RATE', payload: rate });
+          
+          // Update receive amount with new exchange rate
+          if (state.amount) {
+            const receiveAmount = state.amount * rate;
+            dispatch({ type: 'SET_RECEIVE_AMOUNT', payload: receiveAmount });
+          }
+        } catch (error) {
+          handleApiError(error, 'Failed to fetch exchange rate');
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    
+    fetchExchangeRate();
+  }, [state.sourceCurrency, state.targetCurrency, dispatch]);
+  
+  const handleAmountChange = (value: string) => {
+    // Allow only numbers and decimals
+    const sanitizedValue = value.replace(/[^0-9.]/g, '');
+    setSendAmount(sanitizedValue);
+  };
+  
+  const handleSendCurrencyChange = (currency: string) => {
+    dispatch({ type: 'SET_SOURCE_CURRENCY', payload: currency });
+  };
+  
+  const handleReceiveCurrencyChange = (currency: string) => {
+    dispatch({ type: 'SET_TARGET_CURRENCY', payload: currency });
+  };
+  
+  const handleBack = () => {
+    dispatch({ type: 'SET_STEP', payload: 2 });
+  };
+  
+  const handleNext = () => {
+    if (!sendAmount || parseFloat(sendAmount) <= 0) {
+      toast({
+        title: 'Invalid Amount',
+        description: 'Please enter a valid amount to send.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    dispatch({ type: 'SET_STEP', payload: 4 });
+  };
+  return (
+    <div className="space-y-6 max-w-3xl mx-auto">
+      {/* Back button and title */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={handleBack}
+            className="mr-2 rounded-full h-9 w-9"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h2 className="text-xl font-medium">Enter Amount</h2>
         </div>
-      </motion.div>
+        
+        <Button 
+          onClick={handleNext}
+          className="bg-primary hover:bg-primary/90 text-white rounded-full px-5"
+        >
+          <span>Next</span>
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </div>
+      
+      {/* Amount entry */}
+      <Card className="card-ios overflow-hidden border-border/50">
+        <CardContent className="p-6">
+          <div className="space-y-6">
+            <div className="flex flex-col items-center">
+              <div className="relative w-full max-w-md">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <DollarSign className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <motion.input
+                  type="text"
+                  value={sendAmount}
+                  onChange={(e) => handleAmountChange(e.target.value)}
+                  placeholder="0.00"
+                  className={cn(
+                    "block w-full pl-10 pr-24 py-3 text-3xl font-semibold text-center rounded-[14px]",
+                    "border-border/50 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-0"
+                  )}
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                />
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                  <Select 
+                    value={state.sourceCurrency || 'USD'} 
+                    onValueChange={handleSendCurrencyChange}
+                  >
+                    <SelectTrigger className="w-20 h-10 border-0 bg-transparent">
+                      <SelectValue placeholder="USD" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableCurrencies.map((currency) => (
+                        <SelectItem key={currency} value={currency}>{currency}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Exchange rate and conversion */}
+      <div className="flex items-center justify-center space-x-4 bg-muted/30 py-3 rounded-[14px]">
+        <div className="text-sm text-muted-foreground flex items-center">
+          <span>1 {state.sourceCurrency || 'USD'} = {exchangeRate.toFixed(4)} {state.targetCurrency || 'EUR'}</span>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-6 w-6 ml-1">
+                  <Info className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Exchange rates are updated in real-time</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-7 w-7 rounded-full"
+          onClick={() => {
+            // Refresh exchange rate
+            const fetchRate = async () => {
+              if (!state.sourceCurrency || !state.targetCurrency) return;
+              
+              setLoading(true);
+              try {
+                const rate = await getExchangeRate(
+                  state.sourceCurrency,
+                  state.targetCurrency
+                );
+                setExchangeRate(rate);
+                dispatch({ type: 'SET_EXCHANGE_RATE', payload: rate });
+                
+                toast({
+                  title: 'Exchange Rate Updated',
+                  description: `1 ${state.sourceCurrency} = ${rate.toFixed(4)} ${state.targetCurrency}`,
+                });
+              } catch (error) {
+                handleApiError(error, 'Failed to update exchange rate');
+              } finally {
+                setLoading(false);
+              }
+            };
+            fetchRate();
+          }}
+          disabled={loading}
+        >
+          <RefreshCw className={`h-4 w-4 text-primary ${loading ? 'animate-spin' : ''}`} />
+        </Button>
+      </div>
+
+      {/* Fee and total */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="card-ios overflow-hidden border-border/50">
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground mb-1">Fee</p>
+            <p className="text-xl font-semibold">
+              {state.sourceCurrency || 'USD'} {fee.toFixed(2)}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="card-ios overflow-hidden border-border/50">
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground mb-1">You Send</p>
+            <p className="text-xl font-semibold">
+              {state.sourceCurrency || 'USD'} {((parseFloat(sendAmount) || 0) + fee).toFixed(2)}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="card-ios overflow-hidden border-primary/20">
+          <CardContent className="p-4 bg-primary/5">
+            <p className="text-sm text-muted-foreground mb-1">Recipient Gets</p>
+            <p className="text-xl font-semibold text-primary">
+              {state.targetCurrency || 'EUR'} {state.receiveAmount?.toFixed(2) || '0.00'}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recipient currency selection */}
+      <Card className="card-ios overflow-hidden border-border/50">
+        <CardContent className="p-6">
+          <h3 className="text-lg font-medium mb-4">Recipient Currency</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {availableCurrencies.map((currency) => (
+              <div 
+                key={currency}
+                onClick={() => handleReceiveCurrencyChange(currency)}
+                className={cn(
+                  "p-3 border rounded-[14px] cursor-pointer transition-all text-center",
+                  state.targetCurrency === currency 
+                    ? "border-primary bg-primary/10 text-primary" 
+                    : "border-border/50 hover:border-primary/30 hover:bg-muted/30"
+                )}
+              >
+                <p className="font-medium">{currency}</p>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Delivery time */}
+      <Card className="card-ios overflow-hidden border-border/50">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium">Delivery Time</h3>
+              <p className="text-muted-foreground">Estimated time for funds to arrive</p>
+            </div>
+            <div className="text-right bg-success/10 px-4 py-2 rounded-[14px]">
+              <p className="text-success font-medium">Within 24 hours</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

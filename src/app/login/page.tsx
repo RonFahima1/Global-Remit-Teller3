@@ -1,13 +1,15 @@
 'use client';
 import { useRouter } from "next/navigation";
-import { useAuth } from '@/context/AuthContext';
+import Link from "next/link";
+import { useAuth } from '@/components/auth/auth-provider';
 import { useEffect, useState } from 'react';
-import { Banknote } from "lucide-react";
+import { Banknote, Mail } from "lucide-react";
 import { Button } from '@/components/ui/button';
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/logo";
 import { Input } from '@/components/ui/input';
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from 'sonner';
 
 // Microsoft blue four-square logo (no wordmark)
 function MicrosoftIcon({ className = "" }) {
@@ -40,11 +42,12 @@ const QUOTES = [
 ];
 
 export default function LoginPage() {
-  const { user, loading, login } = useAuth();
+  const { user, loading, loginWithCredentials, loginWithMicrosoft } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isLoggingInWithMicrosoft, setIsLoggingInWithMicrosoft] = useState(false);
 
   // Quote rotator
   const [quoteIdx, setQuoteIdx] = useState(0);
@@ -64,10 +67,42 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    
     try {
-      await login(email, password);
+      await loginWithCredentials(email, password);
+      router.push('/dashboard');
     } catch (err) {
-      setError('Invalid email or password');
+      setError(err instanceof Error ? err.message : 'Failed to login');
+      toast.error(err instanceof Error ? err.message : 'Failed to login');
+    }
+  };
+  
+  const handleMicrosoftLogin = async () => {
+    setError(null);
+    setIsLoggingInWithMicrosoft(true);
+    
+    try {
+      await loginWithMicrosoft();
+      // No need to redirect here as the Microsoft login will handle the redirect
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to login with Microsoft');
+      toast.error(err instanceof Error ? err.message : 'Failed to login with Microsoft');
+      setIsLoggingInWithMicrosoft(false);
+    }
+  };
+  
+  // Development mode login handler
+  const handleDevLogin = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    setError(null);
+    
+    try {
+      // Use the teller account credentials
+      await loginWithCredentials('teller@globalremit.com', 'password');
+      router.push('/dashboard');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to login with dev account');
+      toast.error(err instanceof Error ? err.message : 'Failed to login with dev account');
     }
   };
 
@@ -149,7 +184,7 @@ export default function LoginPage() {
                   />
                 </div>
                 <div className="flex justify-end mt-1">
-                  <a href="#" className="text-xs text-blue-500 dark:text-blue-400 hover:underline transition">Forgot password?</a>
+                  <Link href="/reset-password" className="text-xs text-blue-500 dark:text-blue-400 hover:underline transition">Forgot password?</Link>
                 </div>
               </div>
               {error && (
@@ -157,26 +192,70 @@ export default function LoginPage() {
               )}
               <Button
                 type="submit"
-                className="w-full rounded-xl bg-[#0A84FF] text-white font-medium py-3 hover:bg-[#0064d6] active:scale-95 transition-all focus:ring-2 focus:ring-[#007AFF]/40 shadow-sm hover:shadow-md"
+                className="w-full h-14 bg-[#007AFF] hover:bg-[#0066CC] text-white rounded-xl font-semibold text-base transition-colors flex items-center justify-center"
                 disabled={loading}
               >
-                {loading ? 'Signing in...' : 'Login as Demo User'}
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Signing in...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <Mail className="h-5 w-5" />
+                    Sign In with Email
+                  </span>
+                )}
               </Button>
-              {/* Divider with or */}
-              <div className="flex items-center gap-2 my-2">
-                <span className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-                <span className="text-xs text-gray-400 dark:text-gray-500 font-medium">or</span>
-                <span className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+              
+              {/* Microsoft SSO Login Button */}
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-gray-300 dark:border-gray-700" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white dark:bg-gray-900 px-2 text-gray-500 dark:text-gray-400">
+                    Or continue with
+                  </span>
+                </div>
               </div>
+              
               <Button
                 type="button"
-                className="w-full rounded-xl bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-400 border border-blue-500 dark:border-blue-600 py-3 hover:bg-blue-50 dark:hover:bg-blue-900/20 active:scale-95 transition-all flex items-center justify-center gap-2 focus:ring-2 focus:ring-[#007AFF]/40 shadow-sm hover:shadow-md"
-                onClick={() => login('demo@example.com', 'demo')}
-                disabled={loading}
+                onClick={handleMicrosoftLogin}
+                className="w-full h-14 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-xl font-semibold text-base transition-colors flex items-center justify-center gap-2"
+                disabled={loading || isLoggingInWithMicrosoft}
               >
-                <MicrosoftIcon className="mr-2" />
-                Sign in with Microsoft
+                {isLoggingInWithMicrosoft ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-5 w-5 border-2 border-gray-300 dark:border-gray-600 border-t-blue-500 rounded-full animate-spin" />
+                    Connecting to Microsoft...
+                  </span>
+                ) : (
+                  <>
+                    <MicrosoftIcon className="h-5 w-5" />
+                    Sign in with Microsoft
+                  </>
+                )}
               </Button>
+              {/* Development mode login button */}
+              {process.env.NODE_ENV === 'development' && (
+                <Button
+                  type="button"
+                  onClick={handleDevLogin}
+                  className="mt-4 w-full h-12 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold text-sm transition-colors flex items-center justify-center"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <span className="flex items-center gap-2">
+                      <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Loading...
+                    </span>
+                  ) : (
+                    'DEV MODE: Login as Teller'
+                  )}
+                </Button>
+              )}
             </form>
             {/* Footer */}
             <div className="mt-4 text-center text-xs text-gray-400 dark:text-gray-500">
